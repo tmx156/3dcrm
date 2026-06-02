@@ -633,8 +633,8 @@ const Calendar = () => {
     if (!calendarEl) return;
     const start = info.event.start;
     if (!start) return;
-    const h = String(start.getHours()).padStart(2, '0');
-    const m = String(start.getMinutes()).padStart(2, '0');
+    const h = String(start.getUTCHours()).padStart(2, '0');
+    const m = String(start.getUTCMinutes()).padStart(2, '0');
     const time = `${h}:${m}:00`;
     const slot = calendarEl.querySelector(`.fc-timegrid-slot-lane[data-time="${time}"]`);
     if (slot) slot.classList.add('has-event');
@@ -645,8 +645,8 @@ const Calendar = () => {
     if (!calendarEl) return;
     const start = info.event.start;
     if (!start) return;
-    const h = String(start.getHours()).padStart(2, '0');
-    const m = String(start.getMinutes()).padStart(2, '0');
+    const h = String(start.getUTCHours()).padStart(2, '0');
+    const m = String(start.getUTCMinutes()).padStart(2, '0');
     const time = `${h}:${m}:00`;
     const slot = calendarEl.querySelector(`.fc-timegrid-slot-lane[data-time="${time}"]`);
     if (slot) {
@@ -983,17 +983,17 @@ const Calendar = () => {
       const selectedDateTime = clickInfo.date || clickInfo.start || new Date(clickInfo.dateStr || clickInfo.startStr);
       
       // Check if the selected time is within business hours (10 AM - 5:45 PM)
-      const hour = selectedDateTime.getHours();
-      const minute = selectedDateTime.getMinutes();
+      const hour = selectedDateTime.getUTCHours();
+      const minute = selectedDateTime.getUTCMinutes();
 
       if (hour < 10 || (hour >= 17 && minute > 45)) {
         alert('Please select a time between 10:00 AM and 5:45 PM');
         return;
       }
-      
+
       // Round to nearest 15-minute interval
       const roundedMinutes = Math.round(minute / 15) * 15;
-      selectedDateTime.setMinutes(roundedMinutes, 0, 0);
+      selectedDateTime.setUTCMinutes(roundedMinutes, 0, 0);
       
       // Debug logging for timezone handling
       console.log('🕐 Click Debug:', {
@@ -1046,11 +1046,11 @@ const Calendar = () => {
     endDateTime.setMinutes(endDateTime.getMinutes() + 15); // 15-minute booking slots
     
     // TIMEZONE FIX: Preserve exact local time without UTC conversion
-    const year = selectedDateTime.getFullYear();
-    const month = selectedDateTime.getMonth();
-    const date = selectedDateTime.getDate();
-    const hours = selectedDateTime.getHours();
-    const minutes = selectedDateTime.getMinutes();
+    const year = selectedDateTime.getUTCFullYear();
+    const month = selectedDateTime.getUTCMonth();
+    const date = selectedDateTime.getUTCDate();
+    const hours = selectedDateTime.getUTCHours();
+    const minutes = selectedDateTime.getUTCMinutes();
     
     // Create a new date with the same local time components
     const localDateTime = new Date(year, month, date, hours, minutes, 0, 0);
@@ -1832,23 +1832,26 @@ const Calendar = () => {
     
     const selectedDateTime = selectedDate.date;
     const endDateTime = new Date(selectedDateTime);
-    endDateTime.setHours(endDateTime.getHours() + 1); // 1-hour slots
-    
+    endDateTime.setUTCHours(endDateTime.getUTCHours() + 1);
+
     return {
       date: selectedDateTime.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'UTC'
       }),
       time: `${selectedDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'UTC'
       })} - ${endDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'UTC'
       })}`
     };
   };
@@ -2312,11 +2315,11 @@ const Calendar = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">New Time</label>
                       <div className="grid grid-cols-2 gap-2">
                         <select
-                          value={selectedDate ? selectedDate.date.getHours() : 9}
+                          value={selectedDate ? selectedDate.date.getUTCHours() : 9}
                           onChange={(e) => {
                             if (selectedDate) {
                               const newDate = new Date(selectedDate.date);
-                              newDate.setHours(parseInt(e.target.value), newDate.getMinutes());
+                              newDate.setUTCHours(parseInt(e.target.value), newDate.getUTCMinutes());
                               setSelectedDate({ 
                                 dateStr: newDate.toISOString(), 
                                 date: newDate 
@@ -2333,11 +2336,11 @@ const Calendar = () => {
                         </select>
                         
                         <select
-                          value={selectedDate ? selectedDate.date.getMinutes() : 0}
+                          value={selectedDate ? selectedDate.date.getUTCMinutes() : 0}
                           onChange={(e) => {
                             if (selectedDate) {
                               const newDate = new Date(selectedDate.date);
-                              newDate.setMinutes(parseInt(e.target.value));
+                              newDate.setUTCMinutes(parseInt(e.target.value));
                               setSelectedDate({ 
                                 dateStr: newDate.toISOString(), 
                                 date: newDate 
