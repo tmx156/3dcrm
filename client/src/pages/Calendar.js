@@ -1056,8 +1056,8 @@ const Calendar = () => {
     const localDateTime = new Date(year, month, date, hours, minutes, 0, 0);
     const localEndDateTime = new Date(year, month, date, hours, minutes + 15, 0, 0);
     
-    // Use the actual Date object's toISOString() which correctly converts local to UTC
-    const localISOString = localDateTime.toISOString();
+    // Store exactly what the user picked — no timezone conversion
+    const localISOString = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00.000Z`;
     
     // Debug logging to show the time handling
     console.log('🕐 Time Debug:', {
@@ -2092,7 +2092,7 @@ const Calendar = () => {
             start: '10:00',
             end: '18:15'
           }}
-          timeZone='Europe/London'
+          timeZone='UTC'
           eventMaxStack={5}
           moreLinkClick="popover"
           dayMaxEventRows={false}
