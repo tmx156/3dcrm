@@ -30,7 +30,7 @@ router.get('/auth-url', (req, res) => {
     });
     
     console.log('[Gmail] Auth URL generated successfully');
-    res.json({ url });
+    res.redirect(url);
   } catch (err) {
     console.error('[Gmail] Error generating auth URL:', err.message);
     res.status(500).json({ error: err.message });

@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const multer = require('multer');
 const csv = require('csv-parser');
 const xlsx = require('xlsx');
@@ -14,8 +14,8 @@ const fbCapi = require('../utils/facebookConversions');
 const { createClient } = require('@supabase/supabase-js');
 
 // Supabase configuration
-const supabaseUrl = 'https://tnltvfzltdeilanxhlvy.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubHR2ZnpsdGRlaWxhbnhobHZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxOTk4MzUsImV4cCI6MjA3Mjc3NTgzNX0.T_HaALQeSiCjLkpVuwQZUFnJbuSyRy2wf2kWiqJ99Lc';
+const supabaseUrl = 'https://jxjnmejmudihrxdvhzce.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // IMPORTANT: Diary updates should only be triggered by registered users manually
@@ -1962,7 +1962,7 @@ router.put('/:id/assign', auth, adminAuth, async (req, res) => {
     // Update the lead - assign booker and change status to Assigned if currently New
     // Use service role client to bypass RLS policies
     const serviceRoleClient = createClient(
-      process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co',
+      process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co',
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
     );
 
@@ -2358,7 +2358,7 @@ router.put('/bulk-assign', auth, adminAuth, async (req, res) => {
 
     // Create service role client to bypass RLS policies for admin operations
     const serviceRoleClient = createClient(
-      process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co',
+      process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co',
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
     );
 

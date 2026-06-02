@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "buildCommand": "npm run railway:build",
@@ -22,7 +22,7 @@
           "ports": [993]
         },
         {
-          "host": "tnltvfzltdeilanxhlvy.supabase.co",
+          "host": "jxjnmejmudihrxdvhzce.supabase.co",
           "ports": [443]
         }
       ]

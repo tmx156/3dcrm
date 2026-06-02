@@ -1,4 +1,4 @@
-const axios = require('axios');
+﻿const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -19,8 +19,8 @@ function normalizeEmail(email) {
 async function fetchLegacyLeads() {
   try {
     // Initialize Supabase client with hardcoded credentials (same as database manager)
-    const supabaseUrl = 'https://tnltvfzltdeilanxhlvy.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubHR2ZnpsdGRlaWxhbnhobHZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxOTk4MzUsImV4cCI6MjA3Mjc3NTgzNX0.T_HaALQeSiCjLkpVuwQZUFnJbuSyRy2wf2kWiqJ99Lc';
+    const supabaseUrl = 'https://jxjnmejmudihrxdvhzce.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 

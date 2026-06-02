@@ -17,8 +17,8 @@ const config = {
 
   // Supabase Configuration
   supabase: {
-    url: process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co',
-    anonKey: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubHR2ZnpsdGRlaWxhbnhobHZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxOTk4MzUsImV4cCI6MjA3Mjc3NTgzNX0.T_HaALQeSiCjLkpVuwQZUFnJbuSyRy2wf2kWiqJ99Lc',
+    url: process.env.SUPABASE_URL,
+    anonKey: process.env.SUPABASE_ANON_KEY,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null
   },
 
@@ -96,9 +96,8 @@ config.validate = function() {
     console.warn('Using fallback values - please set proper environment variables in production');
   }
 
-  // Warn about hardcoded credentials
-  if (this.supabase.anonKey.includes('tnltvfzltdeilanxhlvy')) {
-    console.warn('⚠️ Using hardcoded Supabase credentials - create .env file for production');
+  if (!this.supabase.url || !this.supabase.anonKey) {
+    console.warn('⚠️ Missing Supabase credentials - set SUPABASE_URL and SUPABASE_ANON_KEY in .env');
   }
 
   return missing.length === 0;
