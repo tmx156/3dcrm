@@ -1342,7 +1342,7 @@ router.post('/', auth, async (req, res) => {
       image_url: leadData.image_url || '',
       parent_phone: leadData.parent_phone || '',
       age: leadData.age || null,
-      booker_id: leadData.booker || null,
+      booker_id: leadData.booker_id || leadData.booker || null,
       created_by_user_id: req.user.id, // Track who created this booking
       status: leadData.status || 'New',
       date_booked: leadData.date_booked ? preserveLocalTime(leadData.date_booked) : null,

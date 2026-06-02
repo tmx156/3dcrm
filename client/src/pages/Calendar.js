@@ -1103,7 +1103,7 @@ const Calendar = () => {
         ...((_id && _id !== '') ? { _id } : {}),
         status: 'Booked',
         is_confirmed: leadForm.isReschedule ? 0 : 0, // Reset to unconfirmed (0) when rescheduling, 0 for new bookings
-        booker: currentUser._id || currentUser.id || '507f1f77bcf86cd799439012',
+        booker_id: currentUser._id || currentUser.id,
         // Add reschedule fields if this is a reschedule
         ...(leadForm.isReschedule && {
           booking_status: 'Reschedule', // Set to new Reschedule status to indicate rescheduling
