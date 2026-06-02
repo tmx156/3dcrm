@@ -1603,15 +1603,23 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
       // Calendar won't show it because it filters by status
       console.log(`📅 Lead cancelled but preserving original date_booked for tracking`);
     }
-    // Update the lead - filter out problematic fields and ensure valid data types
+    // Update the lead - filter to only valid database columns
     const { _id, ...updateData } = req.body;
-    
-    // Filter out any fields that might cause SQLite binding issues
+
+    const VALID_LEAD_COLUMNS = new Set([
+      'name', 'phone', 'email', 'postcode', 'image_url', 'parent_phone', 'age',
+      'booker_id', 'created_by_user_id', 'updated_by_user_id', 'status',
+      'date_booked', 'booked_at', 'assigned_at', 'booking_history', 'notes',
+      'is_confirmed', 'booking_status', 'ever_booked', 'deleted_at',
+      'updated_at', 'has_sale', 'model_stats',
+      // camelCase variants that get converted below
+      'bookingHistory', 'dateBooked', 'isConfirmed', 'hasSale', 'bookingStatus', 'modelStats'
+    ]);
+
     const validUpdateData = {};
     for (const [key, value] of Object.entries(updateData)) {
-      // Do not persist transient messaging flags and computed fields
-      if (key === 'sendEmail' || key === 'sendSms' || key === 'booker_name' || key === 'booker_email' || key === 'cancellation_reason') continue;
-      if (value === undefined) continue; // Skip undefined values completely
+      if (!VALID_LEAD_COLUMNS.has(key)) continue;
+      if (value === undefined) continue;
 
       // Convert camelCase field names to snake_case for database columns
       const dbKey = key === 'bookingHistory' ? 'booking_history' :
