@@ -2092,7 +2092,7 @@ const Calendar = () => {
             start: '10:00',
             end: '18:15'
           }}
-          timeZone='local'
+          timeZone='Europe/London'
           eventMaxStack={5}
           moreLinkClick="popover"
           dayMaxEventRows={false}
