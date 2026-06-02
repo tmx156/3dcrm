@@ -14,7 +14,7 @@ const { getAuthedClient } = require('./gmailClient');
 
 // The sending address — must match the account authorised via OAuth
 const GMAIL_FROM = process.env.GMAIL_USER || process.env.EMAIL_USER;
-const FROM_NAME = 'The Editorial Co';
+const FROM_NAME = '3D Models';
 
 console.log(`[Gmail API] Sending as: ${FROM_NAME} <${GMAIL_FROM || 'NOT SET'}>`);
 

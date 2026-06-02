@@ -1610,7 +1610,7 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
     const validUpdateData = {};
     for (const [key, value] of Object.entries(updateData)) {
       // Do not persist transient messaging flags and computed fields
-      if (key === 'sendEmail' || key === 'sendSms' || key === 'booker_name' || key === 'booker_email') continue;
+      if (key === 'sendEmail' || key === 'sendSms' || key === 'booker_name' || key === 'booker_email' || key === 'cancellation_reason') continue;
       if (value === undefined) continue; // Skip undefined values completely
 
       // Convert camelCase field names to snake_case for database columns
