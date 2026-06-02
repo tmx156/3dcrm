@@ -1,4 +1,4 @@
-// const Database = require('better-sqlite3'); // Removed - using Supabase only
+﻿// const Database = require('better-sqlite3'); // Removed - using Supabase only
 const path = require('path');
 const { sendEmail: sendActualEmail } = require('./emailService');
 const { sendSMS: sendActualSMS } = require('./smsService');
@@ -134,7 +134,7 @@ class MessagingService {
         second: '2-digit',
         timeZone: 'UTC' // Keep UTC time to match calendar
       }) : '',
-      '{companyName}': 'The Editorial Co',
+      '{companyName}': '3D Models',
       '{currentDate}': new Date().toLocaleDateString(),
       '{currentTime}': new Date().toLocaleTimeString()
     };

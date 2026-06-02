@@ -1,4 +1,4 @@
-// 🚨 WARNING: SQLite functionality has been temporarily disabled during migration to Supabase
+﻿// 🚨 WARNING: SQLite functionality has been temporarily disabled during migration to Supabase
 // This route needs to be updated to use Supabase instead of SQLite
 // Many functions in this file will not work until properly migrated
 
@@ -157,13 +157,13 @@ router.post('/campaign/start', auth, adminAuth, async (req, res) => {
         // Replace template variables
         const personalizedSubject = template.subject
           .replace(/{leadName}/g, lead.name)
-          .replace(/{companyName}/g, 'The Editorial Co');
+          .replace(/{companyName}/g, '3D Models');
 
         const personalizedBody = (template.email_body || template.content || '')
           .replace(/{leadName}/g, lead.name)
           .replace(/{leadEmail}/g, lead.email)
           .replace(/{leadPhone}/g, lead.phone)
-          .replace(/{companyName}/g, 'The Editorial Co')
+          .replace(/{companyName}/g, '3D Models')
           .replace(/{originalContactDate}/g, new Date(lead.created_at).toLocaleDateString());
 
         // Send email using messaging service

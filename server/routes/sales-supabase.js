@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const dbManager = require('../database-connection-manager');
@@ -27,7 +27,7 @@ const sendSaleReceipt = async (sale, lead, customEmail, customPhone, sendEmail =
     // Create processed template with sale variables
     const processedTemplate = {
       subject: 'Your Editorial Co Receipt',
-      content: `Dear {leadName},\n\nThank you for your purchase with The Editorial Co!\n\nRECEIPT DETAILS\n===============\nReceipt ID: {receiptId}\nDate: {saleDate}\n\nPURCHASE INFORMATION\n===================\nAmount: {saleAmountFormatted}\nPayment Method: {paymentMethod}\nPayment Type: {paymentType}\nStatus: Completed\n\nCUSTOMER INFORMATION\n===================\nName: {leadName}\nEmail: {leadEmail}\n\n{saleNotes}\n\nThank you for choosing The Editorial Co. We appreciate your business!\n\nIf you have any questions about this purchase, please don't hesitate to contact us.\n\nBest regards,\nThe Editorial Co Team\n\n---\nThis is an automated receipt. Please keep this for your records.`
+      content: `Dear {leadName},\n\nThank you for your purchase with 3D Models!\n\nRECEIPT DETAILS\n===============\nReceipt ID: {receiptId}\nDate: {saleDate}\n\nPURCHASE INFORMATION\n===================\nAmount: {saleAmountFormatted}\nPayment Method: {paymentMethod}\nPayment Type: {paymentType}\nStatus: Completed\n\nCUSTOMER INFORMATION\n===================\nName: {leadName}\nEmail: {leadEmail}\n\n{saleNotes}\n\nThank you for choosing 3D Models. We appreciate your business!\n\nIf you have any questions about this purchase, please don't hesitate to contact us.\n\nBest regards,\n3D Models Team\n\n---\nThis is an automated receipt. Please keep this for your records.`
         .replace(/{leadName}/g, lead.name || 'Customer')
         .replace(/{leadEmail}/g, lead.email || '')
         .replace(/{receiptId}/g, receiptId)
