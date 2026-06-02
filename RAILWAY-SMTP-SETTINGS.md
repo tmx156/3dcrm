@@ -1,4 +1,4 @@
-# Railway SMTP Settings Guide
+﻿# Railway SMTP Settings Guide
 
 ## 🚂 **Railway Dashboard Settings**
 
@@ -17,7 +17,7 @@ In your Railway dashboard, go to **Settings → Networking**:
 Allow: smtp.gmail.com:465
 Allow: smtp.gmail.com:587
 Allow: imap.gmail.com:993
-Allow: tnltvfzltdeilanxhlvy.supabase.co:443
+Allow: jxjnmejmudihrxdvhzce.supabase.co:443
 ```
 
 ### **2. Environment Variables**
@@ -32,7 +32,7 @@ GMAIL_USER=avensismodels.co.uk.crm.bookings@gmail.com
 GMAIL_PASS=your_16_character_app_password
 
 # Supabase Configuration
-SUPABASE_URL=https://tnltvfzltdeilanxhlvy.supabase.co
+SUPABASE_URL=https://jxjnmejmudihrxdvhzce.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
@@ -95,7 +95,7 @@ I've updated your `railway.json` with SMTP-optimized settings:
           "ports": [993]
         },
         {
-          "host": "tnltvfzltdeilanxhlvy.supabase.co",
+          "host": "jxjnmejmudihrxdvhzce.supabase.co",
           "ports": [443]
         }
       ]

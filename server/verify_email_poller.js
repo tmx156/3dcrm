@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 
 /**
  * Email Poller Verification Script
@@ -86,7 +86,7 @@ if (!envOk) {
 console.log('\n🗄️ Testing Supabase Connection...');
 try {
   const { createClient } = require('@supabase/supabase-js');
-  const supabaseUrl = process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co';
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
   const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
   
   if (!supabaseKey) {

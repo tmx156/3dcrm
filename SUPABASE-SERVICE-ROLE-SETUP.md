@@ -1,10 +1,10 @@
-# Supabase Service Role Key Setup Guide
+﻿# Supabase Service Role Key Setup Guide
 
 ## 🔑 Getting Your Supabase Service Role Key
 
 1. **Go to your Supabase Dashboard**:
    - Visit: https://supabase.com/dashboard
-   - Select your project: `tnltvfzltdeilanxhlvy`
+   - Select your project: `jxjnmejmudihrxdvhzce`
 
 2. **Navigate to Settings**:
    - Click on "Settings" in the left sidebar

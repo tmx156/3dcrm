@@ -1,11 +1,11 @@
-const { ImapFlow } = require('imapflow');
+﻿const { ImapFlow } = require('imapflow');
 const { createClient } = require('@supabase/supabase-js');
 const { simpleParser } = require('mailparser');
 const { randomUUID } = require('crypto');
 require('dotenv').config();
 
 // Configuration
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const EMAIL_USER = process.env.EMAIL_USER || process.env.GMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASSWORD || process.env.GMAIL_PASS;

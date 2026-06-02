@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 
 /**
  * Email Poller Updated Test Script
@@ -11,7 +11,7 @@ const { ImapFlow } = require('imapflow');
 
 // Test configuration
 const TEST_CONFIG = {
-  supabaseUrl: process.env.SUPABASE_URL || 'https://tnltvfzltdeilanxhlvy.supabase.co',
+  supabaseUrl: process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co',
   supabaseKey: process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY,
   emailUser: process.env.EMAIL_USER || process.env.GMAIL_USER,
   emailPass: process.env.EMAIL_PASSWORD || process.env.GMAIL_PASS

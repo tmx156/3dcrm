@@ -1,4 +1,4 @@
-# Railway Deployment Guide - CRM System
+﻿# Railway Deployment Guide - CRM System
 
 ## 🚀 Quick Deployment Steps
 
@@ -14,8 +14,8 @@ Set these in your Railway dashboard (Settings → Variables):
 #### Required Variables
 ```env
 # Supabase Database
-SUPABASE_URL=https://tnltvfzltdeilanxhlvy.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubHR2ZnpsdGRlaWxhbnhobHZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxOTk4MzUsImV4cCI6MjA3Mjc3NTgzNX0.T_HaALQeSiCjLkpVuwQZUFnJbuSyRy2wf2kWiqJ99Lc
+SUPABASE_URL=https://jxjnmejmudihrxdvhzce.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # JWT Authentication

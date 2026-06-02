@@ -1,4 +1,4 @@
-# Railway Network Policy Setup Guide
+﻿# Railway Network Policy Setup Guide
 
 ## 🚂 **Method 1: Railway Dashboard**
 
@@ -25,7 +25,7 @@
    If choosing specific connections, add these rules:
    - Host: smtp.gmail.com, Ports: 465, 587
    - Host: imap.gmail.com, Port: 993
-   - Host: tnltvfzltdeilanxhlvy.supabase.co, Port: 443
+   - Host: jxjnmejmudihrxdvhzce.supabase.co, Port: 443
    ```
 
 4. **Save Changes**
@@ -77,7 +77,7 @@ I've already updated your `railway.json` file with the correct network policies:
           "ports": [993]
         },
         {
-          "host": "tnltvfzltdeilanxhlvy.supabase.co",
+          "host": "jxjnmejmudihrxdvhzce.supabase.co",
           "ports": [443]
         }
       ]
