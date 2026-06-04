@@ -127,16 +127,18 @@ class MessagingService {
       '{userEmail}': user.email || '',
       '{bookerName}': bookerInfo ? bookerInfo.name : 'N/A',
       '{bookerEmail}': bookerInfo ? bookerInfo.email : 'N/A',
-      '{bookingDate}': bookingDate ? new Date(bookingDate).toLocaleDateString('en-GB') : '',
+      '{bookingDate}': bookingDate ? new Date(bookingDate).toLocaleDateString('en-GB', { timeZone: 'Europe/London' }) : '',
       '{bookingTime}': bookingDate ? new Date(bookingDate).toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
         timeZone: 'Europe/London'
       }) : '',
       '{companyName}': '3D Models',
-      '{currentDate}': new Date().toLocaleDateString(),
-      '{currentTime}': new Date().toLocaleTimeString()
+      '{currentDate}': new Date().toLocaleDateString('en-GB', { timeZone: 'Europe/London' }),
+      '{currentTime}': new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/London' })
     };
+
+    console.log('📧 Template variables:', { bookingDate, bookingDateFormatted: variables['{bookingDate}'], bookingTimeFormatted: variables['{bookingTime}'] });
 
     // Replace variables in all fields with safety checks
     Object.keys(variables).forEach(key => {
