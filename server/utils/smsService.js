@@ -1,10 +1,6 @@
 ﻿const axios = require('axios');
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase
-const supabaseUrl = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { getSupabaseClient } = require('../config/supabase-client');
+const supabase = getSupabaseClient();
 
 // SMS Service Configuration - BulkSMS
 const SMS_CONFIG = {

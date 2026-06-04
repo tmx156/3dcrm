@@ -1052,9 +1052,9 @@ const Calendar = () => {
     const hours = selectedDateTime.getUTCHours();
     const minutes = selectedDateTime.getUTCMinutes();
     
-    // Create a new date with the same local time components
-    const localDateTime = new Date(year, month, date, hours, minutes, 0, 0);
-    const localEndDateTime = new Date(year, month, date, hours, minutes + 15, 0, 0);
+    // Create UTC dates so FullCalendar (timeZone='UTC') displays them at the correct slot
+    const localDateTime = new Date(Date.UTC(year, month, date, hours, minutes, 0, 0));
+    const localEndDateTime = new Date(Date.UTC(year, month, date, hours, minutes + 15, 0, 0));
     
     // Store exactly what the user picked — no timezone conversion
     const localISOString = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00.000Z`;
@@ -1106,7 +1106,7 @@ const Calendar = () => {
         // Add reschedule fields if this is a reschedule
         ...(leadForm.isReschedule && {
           booking_status: 'Reschedule', // Set to new Reschedule status to indicate rescheduling
-          rescheduleReason: `Appointment rescheduled via calendar to ${localDateTime.toLocaleString()}`
+          rescheduleReason: `Appointment rescheduled via calendar to ${localDateTime.toLocaleString('en-GB', { timeZone: 'UTC' })}`
         })
       };
       
@@ -1840,18 +1840,18 @@ const Calendar = () => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        timeZone: 'UTC'
+        timeZone: 'Europe/London'
       }),
       time: `${selectedDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'UTC'
+        timeZone: 'Europe/London'
       })} - ${endDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'UTC'
+        timeZone: 'Europe/London'
       })}`
     };
   };
@@ -2095,7 +2095,7 @@ const Calendar = () => {
             start: '10:00',
             end: '18:15'
           }}
-          timeZone='UTC'
+          timeZone='Europe/London'
           eventMaxStack={5}
           moreLinkClick="popover"
           dayMaxEventRows={false}

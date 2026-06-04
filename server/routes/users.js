@@ -2,12 +2,8 @@
 const bcrypt = require('bcryptjs');
 const { auth, adminAuth } = require('../middleware/auth');
 const dbManager = require('../database-connection-manager');
-const { createClient } = require('@supabase/supabase-js');
-
-// Supabase configuration
-const supabaseUrl = 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { getSupabaseClient } = require('../config/supabase-client');
+const supabase = getSupabaseClient();
 
 const router = express.Router();
 

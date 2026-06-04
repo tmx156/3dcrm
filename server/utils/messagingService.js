@@ -131,7 +131,7 @@ class MessagingService {
       '{bookingTime}': bookingDate ? new Date(bookingDate).toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'UTC'
+        timeZone: 'Europe/London'
       }) : '',
       '{companyName}': '3D Models',
       '{currentDate}': new Date().toLocaleDateString(),

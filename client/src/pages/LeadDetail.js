@@ -504,15 +504,17 @@ const LeadDetail = () => {
 
   // Template placeholder replacement
   const replacePlaceholders = (message) => {
-    const defaultDate = new Date(lead.dateBooked).toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      month: 'long', 
-      day: 'numeric' 
+    const defaultDate = new Date(lead.dateBooked).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Europe/London'
     });
-    const defaultTime = new Date(lead.dateBooked).toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    const defaultTime = new Date(lead.dateBooked).toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
+      timeZone: 'Europe/London'
     });
 
     return message
@@ -808,7 +810,7 @@ const LeadDetail = () => {
     setRescheduleLoading(true);
     setRescheduleError('');
     try {
-      const isoDateTime = newDate && newTime ? new Date(`${newDate}T${newTime}`).toISOString() : null;
+      const isoDateTime = newDate && newTime ? `${newDate}T${newTime}:00.000Z` : null;
       if (!isoDateTime) {
         setRescheduleError('Please select both date and time.');
         setRescheduleLoading(false);
@@ -821,7 +823,7 @@ const LeadDetail = () => {
         is_confirmed: 0, // Reset to unconfirmed when rescheduling
         booking_status: 'Reschedule', // Set to new Reschedule status to indicate rescheduling
         isReschedule: true,
-        rescheduleReason: `Appointment rescheduled via lead detail to ${new Date(isoDateTime).toLocaleString()}`
+        rescheduleReason: `Appointment rescheduled via lead detail to ${new Date(isoDateTime).toLocaleString('en-GB', { timeZone: 'Europe/London' })}`
       });
       setLead(response.data.lead || response.data);
       setFormData(response.data.lead || response.data);
@@ -855,10 +857,11 @@ const LeadDetail = () => {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Europe/London'
     });
   };
 

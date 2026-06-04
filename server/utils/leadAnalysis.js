@@ -1,6 +1,6 @@
 ﻿const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
-const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseClient } = require('../config/supabase-client');
 
 // Normalize phone number to last 10 digits
 function normalizePhone(phone) {
@@ -18,11 +18,7 @@ function normalizeEmail(email) {
 // Fetch legacy leads from Supabase
 async function fetchLegacyLeads() {
   try {
-    // Initialize Supabase client with hardcoded credentials (same as database manager)
-    const supabaseUrl = 'https://jxjnmejmudihrxdvhzce.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabaseClient();
 
     // Fetch legacy leads from separate legacy_leads table with pagination
     console.log('📜 Fetching legacy leads with pagination...');

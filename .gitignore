@@ -9,6 +9,7 @@ dist/
 # Environment variables
 .env
 .env.local
+RAILWAY-ENV-VARS.txt
 .env.development.local
 .env.test.local
 .env.production.local
@@ -122,6 +123,11 @@ server/email_debug_logs/
 !RAILWAY-*.md
 !railway-*.md
 !*-setup.md
+
+# Google Service Account credentials
+*service-account*.json
+*service_account*.json
+google-service-account.json
 
 # Sample data
 *.csv

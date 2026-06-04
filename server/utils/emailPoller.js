@@ -1,14 +1,9 @@
 ﻿const { ImapFlow } = require('imapflow');
-const { createClient } = require('@supabase/supabase-js');
 const { simpleParser } = require('mailparser');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
-
-// --- Configuration ---
-// Using existing Supabase credentials from config
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
+const { getSupabaseClient } = require('../config/supabase-client');
 
 // Email account configuration (single account - 3D Models)
 const EMAIL_ACCOUNTS = {
@@ -133,10 +128,7 @@ class EmailPoller {
     }
 
     getSupabase() {
-        if (!SUPABASE_KEY) {
-            throw new Error('❌ Supabase Key is not set in environment variables!');
-        }
-        return createClient(SUPABASE_URL, SUPABASE_KEY);
+        return getSupabaseClient();
     }
 
     async connect() {
@@ -1025,8 +1017,9 @@ class EmailPoller {
 
 // --- Export Function ---
 function startEmailPoller(socketIoInstance, accountKeys = ['primary']) {
-    if (!SUPABASE_KEY) {
-        console.error('CRITICAL: Cannot start poller. Missing SUPABASE_KEY environment variable.');
+    const config = require('../config/index');
+    if (!config.supabase.anonKey && !config.supabase.serviceRoleKey) {
+        console.error('CRITICAL: Cannot start poller. Missing Supabase credentials in environment.');
         return [];
     }
 

@@ -2,10 +2,12 @@
  * Find dates with cancelled bookings to demonstrate the ever_booked fix
  */
 
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) { console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars'); process.exit(1); }
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function findCancelledBookings() {

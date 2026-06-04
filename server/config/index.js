@@ -64,7 +64,7 @@ const config = {
 
   // Webhook Configuration (for external lead sources like landing pages)
   webhook: {
-    apiKey: process.env.WEBHOOK_API_KEY || 'a861c0da361d0723faeac04f0d39fa01129152a7b006dd1885e41eb2d8ceb558'
+    apiKey: process.env.WEBHOOK_API_KEY || null
   },
 
   // Facebook Conversions API

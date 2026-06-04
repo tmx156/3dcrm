@@ -7,11 +7,11 @@ Copy and paste these into your Railway dashboard (Settings → Variables):
 ### Core Configuration
 
 ```
-SUPABASE_URL=https://jxjnmejmudihrxdvhzce.supabase.co
+SUPABASE_URL=<GET_FROM_SUPABASE_DASHBOARD>
 ```
 
 ```
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw
+SUPABASE_ANON_KEY=<GET_FROM_SUPABASE_DASHBOARD>
 ```
 
 ```
@@ -51,11 +51,11 @@ NODE_OPTIONS=--max-old-space-size=2048
 Only add if you want SMS functionality:
 
 ```
-BULKSMS_USERNAME=tmx2566
+BULKSMS_USERNAME=<YOUR_BULKSMS_USERNAME>
 ```
 
 ```
-BULKSMS_PASSWORD=Booker100
+BULKSMS_PASSWORD=<YOUR_BULKSMS_PASSWORD>
 ```
 
 ```
@@ -151,7 +151,7 @@ FB_EVENT_SOURCE_URL=
 
 ### Method 2: Railway CLI
 ```bash
-railway variables set SUPABASE_URL="https://jxjnmejmudihrxdvhzce.supabase.co"
+railway variables set SUPABASE_URL="<GET_FROM_SUPABASE_DASHBOARD>"
 railway variables set NODE_ENV="production"
 # ... repeat for each variable
 ```

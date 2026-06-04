@@ -1,8 +1,10 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { createClient } = require('@supabase/supabase-js');
 
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) { console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars'); process.exit(1); }
 const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://yqpcxvtzdwmfllqjkzyi.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxcGN4dnR6ZHdtZmxscWprenlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NzUwMjgsImV4cCI6MjA1NTU1MTAyOH0.fkkWUE9fIz7AaqKnpBqUYu-RpIoF6IpEgWElYTXX3Q4'
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
 (async () => {

@@ -13,8 +13,9 @@ const { createClient } = require('@supabase/supabase-js');
 // Configuration
 const EMAIL_USER = process.env.EMAIL_USER || process.env.GMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASSWORD || process.env.GMAIL_PASS;
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SUPABASE_URL || !SUPABASE_KEY) { console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars'); process.exit(1); }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 

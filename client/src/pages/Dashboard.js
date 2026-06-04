@@ -147,7 +147,7 @@ const Dashboard = () => {
             id: lead.id,
             name: lead.name,
             phone: lead.phone || lead.phone_number,
-            time: lead.date_booked ? new Date(lead.date_booked).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00',
+            time: lead.date_booked ? new Date(lead.date_booked).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) : '12:00',
             status: 'Booked', // Always show as "Booked" in daily activities (real status tracked elsewhere)
             dateBooked: lead.date_booked,
             bookedAt: lead.updated_at || lead.created_at,
@@ -376,7 +376,7 @@ const Dashboard = () => {
         .map(lead => ({
           id: lead.id,
           type: 'booking',
-          message: `${lead.name} booked for ${lead.date_booked ? new Date(lead.date_booked).toLocaleDateString() : 'appointment'}`,
+          message: `${lead.name} booked for ${lead.date_booked ? new Date(lead.date_booked).toLocaleDateString('en-GB', { timeZone: 'Europe/London' }) : 'appointment'}`,
           timestamp: new Date(lead.updated_at || lead.created_at),
           icon: 'calendar'
         }));
@@ -761,7 +761,7 @@ const Dashboard = () => {
                                   {booking.status}
                                 </span>
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                  {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/London' })}
                                 </p>
                               </div>
                             </div>
@@ -1135,7 +1135,7 @@ const Dashboard = () => {
                               {booking.status}
                             </span>
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/London' })}
                             </p>
                           </div>
                         </div>

@@ -12,11 +12,8 @@ const { sendSMS, sendAppointmentReminder, sendStatusUpdate, sendCustomMessage } 
 const { v4: uuidv4 } = require('uuid'); // Added for UUID generation
 const fbCapi = require('../utils/facebookConversions');
 const { createClient } = require('@supabase/supabase-js');
-
-// Supabase configuration
-const supabaseUrl = 'https://jxjnmejmudihrxdvhzce.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { getSupabaseClient } = require('../config/supabase-client');
+const supabase = getSupabaseClient();
 
 // IMPORTANT: Diary updates should only be triggered by registered users manually
 // All upload processes create leads with status 'New' and no dateBooked to prevent
@@ -1122,7 +1119,7 @@ router.post('/', auth, async (req, res) => {
       if (existingLeads && existingLeads.length > 0) {
         // Update the existing lead
         // Remove fields that don't exist in Supabase schema
-        const { isReschedule, sendEmail, sendSms, rescheduleReason, ...cleanBodyData } = bodyWithoutId;
+        const { isReschedule, sendEmail, sendSms, rescheduleReason, booker, sales, currentStatus, ...cleanBodyData } = bodyWithoutId;
         const updateData = {
           ...cleanBodyData,
           date_booked: bodyWithoutId.date_booked ? preserveLocalTime(bodyWithoutId.date_booked) : null,
@@ -1970,7 +1967,7 @@ router.put('/:id/assign', auth, adminAuth, async (req, res) => {
     // Update the lead - assign booker and change status to Assigned if currently New
     // Use service role client to bypass RLS policies
     const serviceRoleClient = createClient(
-      process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co',
+      process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
     );
 
@@ -2366,7 +2363,7 @@ router.put('/bulk-assign', auth, adminAuth, async (req, res) => {
 
     // Create service role client to bypass RLS policies for admin operations
     const serviceRoleClient = createClient(
-      process.env.SUPABASE_URL || 'https://jxjnmejmudihrxdvhzce.supabase.co',
+      process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
     );
 

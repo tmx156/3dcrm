@@ -1,5 +1,8 @@
-﻿const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient('https://jxjnmejmudihrxdvhzce.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4am5tZWptdWRpaHJ4ZHZoemNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDg4NDYsImV4cCI6MjA5NTkyNDg0Nn0.E-_ulU4PpWEdW6A5NXxlLweJ6I5-Ck_Q7Ir5q07DIYw');
+﻿require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+const { createClient } = require('@supabase/supabase-js');
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) { console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars'); process.exit(1); }
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 async function purgeDuplicates() {
   console.log('🧹 DUPLICATE MESSAGE PURGE AUDIT\n');
