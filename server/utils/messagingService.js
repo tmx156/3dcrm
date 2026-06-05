@@ -127,15 +127,15 @@ class MessagingService {
       '{userEmail}': user.email || '',
       '{bookerName}': bookerInfo ? bookerInfo.name : 'N/A',
       '{bookerEmail}': bookerInfo ? bookerInfo.email : 'N/A',
-      '{bookingDate}': bookingDate ? new Date(bookingDate).toLocaleDateString('en-GB', { timeZone: 'Europe/London' }) : '',
+      '{bookingDate}': bookingDate ? new Date(bookingDate).toLocaleDateString('en-GB', { timeZone: 'UTC' }) : '',
       '{bookingTime}': bookingDate ? new Date(bookingDate).toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Europe/London'
+        timeZone: 'UTC'
       }) : '',
       '{companyName}': '3D Models',
-      '{currentDate}': new Date().toLocaleDateString('en-GB', { timeZone: 'Europe/London' }),
-      '{currentTime}': new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/London' })
+      '{currentDate}': new Date().toLocaleDateString('en-GB', { timeZone: 'UTC' }),
+      '{currentTime}': new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' })
     };
 
     console.log('📧 Template variables:', { bookingDate, bookingDateFormatted: variables['{bookingDate}'], bookingTimeFormatted: variables['{bookingTime}'] });

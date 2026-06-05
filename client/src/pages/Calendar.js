@@ -293,7 +293,7 @@ const Calendar = () => {
           
           // Create end date (default to 15 minutes after start)
           const endDate = new Date(startDate);
-          endDate.setMinutes(endDate.getMinutes() + 15);
+          endDate.setUTCMinutes(endDate.getUTCMinutes() + 15);
           
           // Parse booking history for SMS notification icon
           let bookingHistory = lead.booking_history || [];
@@ -1042,39 +1042,15 @@ const Calendar = () => {
 
     // Use the clicked time directly from selectedDate, but ensure we're working with local time
     const selectedDateTime = selectedDate.date || new Date(selectedDate.dateStr);
-    const endDateTime = new Date(selectedDateTime);
-    endDateTime.setMinutes(endDateTime.getMinutes() + 15); // 15-minute booking slots
-    
-    // TIMEZONE FIX: Preserve exact local time without UTC conversion
     const year = selectedDateTime.getUTCFullYear();
     const month = selectedDateTime.getUTCMonth();
     const date = selectedDateTime.getUTCDate();
     const hours = selectedDateTime.getUTCHours();
     const minutes = selectedDateTime.getUTCMinutes();
-    
-    // Create UTC dates so FullCalendar (timeZone='UTC') displays them at the correct slot
+
     const localDateTime = new Date(Date.UTC(year, month, date, hours, minutes, 0, 0));
     const localEndDateTime = new Date(Date.UTC(year, month, date, hours, minutes + 15, 0, 0));
-    
-    // Store exactly what the user picked — no timezone conversion
-    const localISOString = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00.000Z`;
-    
-    // Debug logging to show the time handling
-    console.log('🕐 Time Debug:', {
-      originalSelectedDate: selectedDate,
-      selectedDateTime: selectedDateTime.toISOString(),
-      selectedDateTimeLocal: selectedDateTime.toLocaleString(),
-      selectedDateTimeUTC: selectedDateTime.toUTCString(),
-      localDateTime: localDateTime.toISOString(),
-      localDateTimeLocal: localDateTime.toLocaleString(),
-      endDateTime: endDateTime.toISOString(),
-      endDateTimeLocal: endDateTime.toLocaleString(),
-      timezoneOffset: selectedDateTime.getTimezoneOffset(),
-      hour: selectedDateTime.getHours(),
-      minute: selectedDateTime.getMinutes(),
-      localHour: localDateTime.getHours(),
-      localMinute: localDateTime.getMinutes()
-    });
+    const localISOString = localDateTime.toISOString();
     
     // Create a temporary event ID to track this booking
     const tempEventId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1310,14 +1286,16 @@ const Calendar = () => {
     const start = new Date(event.start);
     const end = event.end ? new Date(event.end) : start;
     
-    return `${start.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return `${start.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
-    })} - ${end.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+      hour12: true,
+      timeZone: 'UTC'
+    })} - ${end.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
+      timeZone: 'UTC'
     })}`;
   };
 
@@ -1840,18 +1818,18 @@ const Calendar = () => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        timeZone: 'Europe/London'
+        timeZone: 'UTC'
       }),
       time: `${selectedDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'Europe/London'
+        timeZone: 'UTC'
       })} - ${endDateTime.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'Europe/London'
+        timeZone: 'UTC'
       })}`
     };
   };
@@ -2095,7 +2073,7 @@ const Calendar = () => {
             start: '10:00',
             end: '18:15'
           }}
-          timeZone='Europe/London'
+          timeZone='UTC'
           eventMaxStack={5}
           moreLinkClick="popover"
           dayMaxEventRows={false}
@@ -2300,7 +2278,7 @@ const Calendar = () => {
                         value={selectedDate ? selectedDate.dateStr.slice(0, 10) : ''}
                         onChange={(e) => {
                           if (e.target.value) {
-                            const newDate = new Date(e.target.value + 'T12:00:00');
+                            const newDate = new Date(e.target.value + 'T12:00:00Z');
                             setSelectedDate({ 
                               dateStr: newDate.toISOString(), 
                               date: newDate 
@@ -2584,7 +2562,8 @@ const Calendar = () => {
                               weekday: 'long',
                               year: 'numeric',
                               month: 'long',
-                              day: 'numeric'
+                              day: 'numeric',
+                              timeZone: 'UTC'
                             }) : 'Date not available'}
                           </p>
                           <p className="text-xs text-gray-600 flex items-center">

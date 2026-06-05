@@ -31,11 +31,10 @@ class BookerReportingScheduler {
         console.error('❌ Scheduled daily report failed:', error);
       }
     }, {
-      scheduled: false,
-      timezone: "Europe/London"
+      scheduled: false
     });
 
-    // Schedule monthly reports to run on the 1st of each month at 9:00 AM
+    // Schedule monthly reports to run on the 1st of each month at 9:00 AM UTC
     this.monthlyJob = cron.schedule('0 9 1 * *', async () => {
       try {
         const lastMonth = new Date();
@@ -49,8 +48,7 @@ class BookerReportingScheduler {
         console.error('❌ Scheduled monthly report failed:', error);
       }
     }, {
-      scheduled: false,
-      timezone: "Europe/London"
+      scheduled: false
     });
 
     // Start the jobs

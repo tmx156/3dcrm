@@ -194,38 +194,35 @@ router.get('/', auth, async (req, res) => {
       const now = new Date();
       let startDate, endDate;
 
-      // Use UK timezone for 'today'
-      const ukNow = new Date(now.toLocaleString('en-GB', { timeZone: 'Europe/London' }));
       switch (dateRange) {
         case 'today': {
-          // Get start and end of today in UK time
-          const ukYear = ukNow.getFullYear();
-          const ukMonth = ukNow.getMonth();
-          const ukDate = ukNow.getDate();
-          startDate = new Date(Date.UTC(ukYear, ukMonth, ukDate, 0, 0, 0));
-          endDate = new Date(Date.UTC(ukYear, ukMonth, ukDate, 23, 59, 59, 999));
+          const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+          startDate = new Date(Date.UTC(y, m, d, 0, 0, 0));
+          endDate = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
           break;
         }
-        case 'this_week':
-          const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-          startDate = new Date(startOfWeek.setHours(0, 0, 0, 0));
+        case 'this_week': {
+          const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()));
+          startDate = startOfWeek;
           endDate = new Date();
           break;
+        }
         case 'this_month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
           break;
         case 'last_month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
           break;
-        case 'this_quarter':
-          const quarterStart = Math.floor(now.getMonth() / 3) * 3;
-          startDate = new Date(now.getFullYear(), quarterStart, 1);
+        case 'this_quarter': {
+          const quarterStart = Math.floor(now.getUTCMonth() / 3) * 3;
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), quarterStart, 1));
           endDate = new Date();
           break;
+        }
         case 'this_year':
-          startDate = new Date(now.getFullYear(), 0, 1);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
           endDate = new Date();
           break;
         default:
@@ -341,30 +338,34 @@ router.get('/stats', auth, async (req, res) => {
       let startDate, endDate;
 
       switch (dateRange) {
-        case 'today':
-          startDate = new Date(now.setHours(0, 0, 0, 0));
-          endDate = new Date(now.setHours(23, 59, 59, 999));
+        case 'today': {
+          const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+          startDate = new Date(Date.UTC(y, m, d, 0, 0, 0));
+          endDate = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
           break;
-        case 'this_week':
-          const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-          startDate = new Date(startOfWeek.setHours(0, 0, 0, 0));
+        }
+        case 'this_week': {
+          const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()));
+          startDate = startOfWeek;
           endDate = new Date();
           break;
+        }
         case 'this_month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
           break;
         case 'last_month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
           break;
-        case 'this_quarter':
-          const quarterStart = Math.floor(now.getMonth() / 3) * 3;
-          startDate = new Date(now.getFullYear(), quarterStart, 1);
+        case 'this_quarter': {
+          const quarterStart = Math.floor(now.getUTCMonth() / 3) * 3;
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), quarterStart, 1));
           endDate = new Date();
           break;
+        }
         case 'this_year':
-          startDate = new Date(now.getFullYear(), 0, 1);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
           endDate = new Date();
           break;
         default:
@@ -586,8 +587,8 @@ router.post('/', auth, async (req, res) => {
 router.get('/by-date/:date', auth, async (req, res) => {
   try {
     const date = new Date(req.params.date);
-    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+    const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 
     const { data: sales, error: salesError } = await supabase
       .from('sales')
@@ -1313,8 +1314,8 @@ router.post('/bulk-communication', auth, async (req, res) => {
           '{saleAmount}': sale.amount || '0.00',
           '{saleAmountFormatted}': new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(sale.amount || 0),
           '{paymentMethod}': sale.payment_method || 'Card',
-          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB'),
-          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }),
+          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }),
           '{receiptId}': sale.id || 'N/A',
           '{saleNotes}': sale.notes || '',
           '{companyName}': 'Modelling Studio CRM',
@@ -1332,8 +1333,8 @@ router.post('/bulk-communication', auth, async (req, res) => {
           if (!financeError && finance) {
             variables['{financePaymentAmount}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.payment_amount || 0);
             variables['{financeFrequency}'] = finance.frequency || 'Monthly';
-            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB');
-            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB');
+            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
+            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
             variables['{remainingBalance}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.remaining_balance || 0);
           }
         }

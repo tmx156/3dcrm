@@ -79,8 +79,8 @@ function getStatusHex(status, hasSale) {
 
 function getTimeSlotIndex(dateStr) {
   const d = new Date(dateStr);
-  const h = d.getHours();
-  const m = d.getMinutes();
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
   const slotMin = Math.floor(m / 15) * 15;
 
   for (let i = 0; i < TIME_SLOTS.length; i++) {

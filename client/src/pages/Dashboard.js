@@ -5,13 +5,10 @@ import axios from 'axios';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import GmailEmailRenderer from '../components/GmailEmailRenderer';
-import { toZonedTime, format } from 'date-fns-tz';
 
-const getTodayUK = () => {
-  const ukTz = 'Europe/London';
+const getTodayUTC = () => {
   const now = new Date();
-  const ukNow = toZonedTime(now, ukTz);
-  return format(ukNow, 'yyyy-MM-dd', { timeZone: ukTz });
+  return now.toISOString().slice(0, 10);
 };
 
 const BOOKED_STATUSES = ['Booked', 'Confirmed', 'Unconfirmed'];
@@ -147,7 +144,7 @@ const Dashboard = () => {
             id: lead.id,
             name: lead.name,
             phone: lead.phone || lead.phone_number,
-            time: lead.date_booked ? new Date(lead.date_booked).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) : '12:00',
+            time: lead.date_booked ? new Date(lead.date_booked).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '12:00',
             status: 'Booked', // Always show as "Booked" in daily activities (real status tracked elsewhere)
             dateBooked: lead.date_booked,
             bookedAt: lead.updated_at || lead.created_at,
@@ -330,18 +327,10 @@ const Dashboard = () => {
   // Fetch recent activity
   const fetchRecentActivity = useCallback(async () => {
     try {
-      // Use UK timezone for "today"
-      const ukTz = 'Europe/London';
       const now = new Date();
-      const ukNow = toZonedTime(now, ukTz);
-      const todayUK = format(ukNow, 'yyyy-MM-dd', { timeZone: ukTz });
-
-      // Create UK time range and convert to UTC
-      const startOfDayUK = new Date(todayUK + 'T00:00:00');
-      const endOfDayUK = new Date(todayUK + 'T23:59:59.999');
-      const offsetMinutes = -startOfDayUK.getTimezoneOffset();
-      const startUTC = new Date(startOfDayUK.getTime() + (offsetMinutes * 60000)).toISOString();
-      const endUTC = new Date(endOfDayUK.getTime() + (offsetMinutes * 60000)).toISOString();
+      const todayStr = now.toISOString().slice(0, 10);
+      const startUTC = todayStr + 'T00:00:00.000Z';
+      const endUTC = todayStr + 'T23:59:59.999Z';
 
       const leadsRes = await axios.get('/api/leads/public', {
         params: {
@@ -358,12 +347,10 @@ const Dashboard = () => {
           const salesRes = await axios.get('/api/sales', {
             params: { dateRange: 'today' }
           });
-          const todayUK = getTodayUK();
+          const todayStr2 = getTodayUTC();
           salesData = (salesRes.data || []).filter(sale => {
             if (!sale.created_at) return false;
-            const ukTz = 'Europe/London';
-            const saleDateUK = format(toZonedTime(new Date(sale.created_at), ukTz), 'yyyy-MM-dd', { timeZone: ukTz });
-            return saleDateUK === todayUK;
+            return new Date(sale.created_at).toISOString().slice(0, 10) === todayStr2;
           });
         } catch (err) {
           console.error('Error fetching sales for activity:', err);
@@ -376,7 +363,7 @@ const Dashboard = () => {
         .map(lead => ({
           id: lead.id,
           type: 'booking',
-          message: `${lead.name} booked for ${lead.date_booked ? new Date(lead.date_booked).toLocaleDateString('en-GB', { timeZone: 'Europe/London' }) : 'appointment'}`,
+          message: `${lead.name} booked for ${lead.date_booked ? new Date(lead.date_booked).toLocaleDateString('en-GB', { timeZone: 'UTC' }) : 'appointment'}`,
           timestamp: new Date(lead.updated_at || lead.created_at),
           icon: 'calendar'
         }));
@@ -761,7 +748,7 @@ const Dashboard = () => {
                                   {booking.status}
                                 </span>
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/London' })}
+                                  {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}
                                 </p>
                               </div>
                             </div>
@@ -1135,7 +1122,7 @@ const Dashboard = () => {
                               {booking.status}
                             </span>
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/London' })}
+                              {new Date(booking.dateBooked).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}
                             </p>
                           </div>
                         </div>

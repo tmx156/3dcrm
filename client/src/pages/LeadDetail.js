@@ -508,13 +508,13 @@ const LeadDetail = () => {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
-      timeZone: 'Europe/London'
+      timeZone: 'UTC'
     });
     const defaultTime = new Date(lead.dateBooked).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'Europe/London'
+      timeZone: 'UTC'
     });
 
     return message
@@ -823,7 +823,7 @@ const LeadDetail = () => {
         is_confirmed: 0, // Reset to unconfirmed when rescheduling
         booking_status: 'Reschedule', // Set to new Reschedule status to indicate rescheduling
         isReschedule: true,
-        rescheduleReason: `Appointment rescheduled via lead detail to ${new Date(isoDateTime).toLocaleString('en-GB', { timeZone: 'Europe/London' })}`
+        rescheduleReason: `Appointment rescheduled via lead detail to ${new Date(isoDateTime).toLocaleString('en-GB', { timeZone: 'UTC' })}`
       });
       setLead(response.data.lead || response.data);
       setFormData(response.data.lead || response.data);
@@ -861,7 +861,7 @@ const LeadDetail = () => {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      timeZone: 'Europe/London'
+      timeZone: 'UTC'
     });
   };
 

@@ -31,7 +31,7 @@ const sendSaleReceipt = async (sale, lead, customEmail, customPhone, sendEmail =
         .replace(/{leadName}/g, lead.name || 'Customer')
         .replace(/{leadEmail}/g, lead.email || '')
         .replace(/{receiptId}/g, receiptId)
-        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString())
+        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
         .replace(/{saleAmountFormatted}/g, `£${sale.amount.toFixed(2)}`)
         .replace(/{paymentMethod}/g, sale.payment_method || 'Unknown')
         .replace(/{paymentType}/g, sale.payment_type || 'full_payment')
@@ -66,7 +66,7 @@ const sendSaleReceipt = async (sale, lead, customEmail, customPhone, sendEmail =
     // Send SMS receipt if enabled
     if (sendSMS && (customPhone || lead.phone)) {
       // Create shorter SMS version of the receipt
-      const smsContent = `Receipt ${receiptId}: Thank you for your purchase of £${sale.amount.toFixed(2)} on ${new Date(sale.created_at).toLocaleDateString()}. Payment: ${sale.payment_method}. - Focus Models`;
+      const smsContent = `Receipt ${receiptId}: Thank you for your purchase of £${sale.amount.toFixed(2)} on ${new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' })}. Payment: ${sale.payment_method}. - Focus Models`;
 
       const smsMessageData = {
         id: `sms-receipt-${sale.id}-${Date.now()}`,
@@ -358,30 +358,34 @@ router.get('/stats', auth, async (req, res) => {
       let startDate, endDate;
 
       switch (dateRange) {
-        case 'today':
-          startDate = new Date(now.setHours(0, 0, 0, 0));
-          endDate = new Date(now.setHours(23, 59, 59, 999));
+        case 'today': {
+          const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+          startDate = new Date(Date.UTC(y, m, d, 0, 0, 0));
+          endDate = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
           break;
-        case 'this_week':
-          const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-          startDate = new Date(startOfWeek.setHours(0, 0, 0, 0));
+        }
+        case 'this_week': {
+          const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()));
+          startDate = startOfWeek;
           endDate = new Date();
           break;
+        }
         case 'this_month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
           break;
         case 'last_month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+          endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
           break;
-        case 'this_quarter':
-          const quarterStart = Math.floor(now.getMonth() / 3) * 3;
-          startDate = new Date(now.getFullYear(), quarterStart, 1);
+        case 'this_quarter': {
+          const quarterStart = Math.floor(now.getUTCMonth() / 3) * 3;
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), quarterStart, 1));
           endDate = new Date();
           break;
+        }
         case 'this_year':
-          startDate = new Date(now.getFullYear(), 0, 1);
+          startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
           endDate = new Date();
           break;
         default:
@@ -1034,8 +1038,8 @@ router.post('/bulk-communication', auth, async (req, res) => {
           '{saleAmount}': sale.amount || '0.00',
           '{saleAmountFormatted}': new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(sale.amount || 0),
           '{paymentMethod}': sale.payment_method || 'Card',
-          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB'),
-          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }),
+          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }),
           '{receiptId}': sale.id || 'N/A',
           '{saleNotes}': sale.notes || '',
           '{companyName}': 'Modelling Studio CRM',
@@ -1053,8 +1057,8 @@ router.post('/bulk-communication', auth, async (req, res) => {
           if (!financeError && finance) {
             variables['{financePaymentAmount}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.payment_amount || 0);
             variables['{financeFrequency}'] = finance.frequency || 'Monthly';
-            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB');
-            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB');
+            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
+            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
             variables['{remainingBalance}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.remaining_balance || 0);
           }
         }

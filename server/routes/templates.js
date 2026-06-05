@@ -573,8 +573,8 @@ router.post('/:id/preview', auth, async (req, res) => {
           '{saleAmount}': sale.amount || saleData.amount || '0.00',
           '{saleAmountFormatted}': new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(sale.amount || saleData.amount || 0),
           '{paymentMethod}': sale.payment_method || 'Card',
-          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB'),
-          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          '{saleDate}': new Date(saleData.sale_date || sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }),
+          '{saleTime}': new Date(saleData.sale_date || sale.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }),
           '{receiptId}': sale.id || 'N/A',
           '{saleNotes}': sale.notes || '',
           '{companyName}': 'Modelling Studio CRM',
@@ -592,8 +592,8 @@ router.post('/:id/preview', auth, async (req, res) => {
           if (!financeError && finance) {
             variables['{financePaymentAmount}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.payment_amount || 0);
             variables['{financeFrequency}'] = finance.frequency || 'Monthly';
-            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB');
-            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB');
+            variables['{financeStartDate}'] = new Date(finance.start_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
+            variables['{nextPaymentDate}'] = new Date(finance.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' });
             variables['{remainingBalance}'] = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(finance.remaining_balance || 0);
           }
         }

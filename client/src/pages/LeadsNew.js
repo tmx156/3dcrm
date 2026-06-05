@@ -93,12 +93,12 @@ const LeadsNew = () => {
     const now = new Date();
     
     // Get today's date string in London timezone (YYYY-MM-DD format)
-    const todayLondonStr = now.toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // YYYY-MM-DD format
+    const todayLondonStr = now.toLocaleDateString('en-CA', { timeZone: 'UTC' }); // YYYY-MM-DD format
     
     // Create Date objects for calculations
     const todayMidnightLondon = new Date(todayLondonStr + 'T00:00:00.000Z');
 
-    console.log('🕐 Current time:', now.toLocaleString('en-GB', { timeZone: 'Europe/London' }));
+    console.log('🕐 Current time:', now.toLocaleString('en-GB', { timeZone: 'UTC' }));
     console.log('📅 Today (London midnight):', todayLondonStr, todayMidnightLondon.toISOString());
 
     switch (dateFilter) {
@@ -300,7 +300,7 @@ const LeadsNew = () => {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-      timeZone: 'Europe/London'
+      timeZone: 'UTC'
     });
   };
 

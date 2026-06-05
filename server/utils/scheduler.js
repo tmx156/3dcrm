@@ -5,27 +5,23 @@ const config = require('../config');
 
 const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey || config.supabase.anonKey);
 
-// Get current time in UK (handles GMT/BST automatically)
-function getUKTime() {
+function getUTCTime() {
   const now = new Date();
-  const ukString = now.toLocaleString('en-GB', { timeZone: 'Europe/London' });
-  // ukString = "09/02/2026, 09:00:00"
-  const [datePart, timePart] = ukString.split(', ');
-  const [day, month, year] = datePart.split('/').map(Number);
-  const [hours, minutes] = timePart.split(':');
+  const hours = String(now.getUTCHours()).padStart(2, '0');
+  const minutes = String(now.getUTCMinutes()).padStart(2, '0');
   return {
-    hours: parseInt(hours),
-    minutes: parseInt(minutes),
-    day,
-    month,
-    year,
-    time: `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`,
-    full: ukString
+    hours: now.getUTCHours(),
+    minutes: now.getUTCMinutes(),
+    day: now.getUTCDate(),
+    month: now.getUTCMonth() + 1,
+    year: now.getUTCFullYear(),
+    time: `${hours}:${minutes}`,
+    full: now.toISOString()
   };
 }
 
-// Get start/end of a UK date as UTC ISO strings for database queries
-function getUKDateRange(ukYear, ukMonth, ukDay, offsetDays = 0) {
+// Get start/end of a UTC date as ISO strings for database queries
+function getUTCDateRange(ukYear, ukMonth, ukDay, offsetDays = 0) {
   const target = new Date(Date.UTC(ukYear, ukMonth - 1, ukDay + offsetDays));
   const y = target.getUTCFullYear();
   const m = String(target.getUTCMonth() + 1).padStart(2, '0');
@@ -56,12 +52,12 @@ class Scheduler {
     }
 
     const now = new Date();
-    const uk = getUKTime();
+    const utcNow = getUTCTime();
     console.log('[SCHEDULER] =============================================');
     console.log('[SCHEDULER] Starting appointment reminder scheduler');
     console.log(`[SCHEDULER] Server UTC: ${now.toISOString()}`);
-    console.log(`[SCHEDULER] UK time:    ${uk.full}`);
-    console.log('[SCHEDULER] All times use Europe/London (GMT/BST auto)');
+    console.log(`[SCHEDULER] UTC time:   ${utcNow.full}`);
+    console.log('[SCHEDULER] All times use UTC');
     console.log('[SCHEDULER] Cron: every minute (* * * * *)');
     console.log('[SCHEDULER] =============================================');
 
@@ -103,12 +99,12 @@ class Scheduler {
     this.tickCount++;
     this.lastTick = new Date().toISOString();
 
-    const uk = getUKTime();
-    const currentTime = uk.time;
+    const utcNow = getUTCTime();
+    const currentTime = utcNow.time;
 
     // Log a heartbeat every 15 minutes (on :00, :15, :30, :45)
-    if (uk.minutes % 15 === 0) {
-      console.log(`[SCHEDULER] Heartbeat ${currentTime} UK | ticks: ${this.tickCount} | scheduled: ${this.scheduledTime || 'unknown'} | next: ${this.nextRun || 'unknown'}`);
+    if (utcNow.minutes % 15 === 0) {
+      console.log(`[SCHEDULER] Heartbeat ${currentTime} UTC | ticks: ${this.tickCount} | scheduled: ${this.scheduledTime || 'unknown'} | next: ${this.nextRun || 'unknown'}`);
     }
 
     // Fetch the template's configured time
@@ -127,7 +123,7 @@ class Scheduler {
 
     if (!templates || templates.length === 0) {
       // Only log this once per hour to avoid spam
-      if (uk.minutes === 0) {
+      if (utcNow.minutes === 0) {
         console.log('[SCHEDULER] No active appointment_reminder template found');
       }
       return;
@@ -145,16 +141,16 @@ class Scheduler {
   }
 
   calculateNextRun(reminderTime) {
-    // Return a human-readable UK time string for the next run
-    const uk = getUKTime();
+    // Return a human-readable time string for the next run
+    const utcNow = getUTCTime();
     const [targetH, targetM] = reminderTime.split(':').map(Number);
-    const currentMinutes = uk.hours * 60 + uk.minutes;
+    const currentMinutes = utcNow.hours * 60 + utcNow.minutes;
     const targetMinutes = targetH * 60 + targetM;
 
     if (targetMinutes > currentMinutes) {
-      return `Today at ${reminderTime} UK`;
+      return `Today at ${reminderTime} UTC`;
     } else {
-      return `Tomorrow at ${reminderTime} UK`;
+      return `Tomorrow at ${reminderTime} UTC`;
     }
   }
 
@@ -177,8 +173,8 @@ class Scheduler {
 
       const template = templates[0];
       const reminderDays = template.reminder_days || 1;
-      const ukNow = getUKTime();
-      const { startISO: startOfDayISO, endISO: endOfDayISO, dateStr: targetDateStr } = getUKDateRange(ukNow.year, ukNow.month, ukNow.day, reminderDays);
+      const utcNow = getUTCTime();
+      const { startISO: startOfDayISO, endISO: endOfDayISO, dateStr: targetDateStr } = getUTCDateRange(utcNow.year, utcNow.month, utcNow.day, reminderDays);
 
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
@@ -195,7 +191,7 @@ class Scheduler {
         return { total: 0, alreadySent: 0, pending: 0, alreadySentLeads: [], pendingLeads: [], targetDate: targetDateStr };
       }
 
-      const { startISO: todayStartISO } = getUKDateRange(ukNow.year, ukNow.month, ukNow.day);
+      const { startISO: todayStartISO } = getUTCDateRange(utcNow.year, utcNow.month, utcNow.day);
       const alreadySentLeads = [];
       const pendingLeads = [];
 
@@ -263,11 +259,11 @@ class Scheduler {
       console.log(`[SCHEDULER] Config: ${reminderDays} day(s) before, send at ${reminderTime}`);
       console.log(`[SCHEDULER] Channels: email=${template.send_email}, sms=${template.send_sms}`);
 
-      // Calculate target appointment date using UK date (not UTC)
-      const ukNow = getUKTime();
-      const { startISO: startOfDayISO, endISO: endOfDayISO, dateStr: targetDateStr } = getUKDateRange(ukNow.year, ukNow.month, ukNow.day, reminderDays);
+      // Calculate target appointment date using UTC date
+      const utcNow = getUTCTime();
+      const { startISO: startOfDayISO, endISO: endOfDayISO, dateStr: targetDateStr } = getUTCDateRange(utcNow.year, utcNow.month, utcNow.day, reminderDays);
 
-      console.log(`[SCHEDULER] UK date today: ${ukNow.day}/${ukNow.month}/${ukNow.year}`);
+      console.log(`[SCHEDULER] UTC date today: ${utcNow.day}/${utcNow.month}/${utcNow.year}`);
       console.log(`[SCHEDULER] Looking for appointments on: ${targetDateStr} (${reminderDays} day(s) ahead)`);
       console.log(`[SCHEDULER] Query range: ${startOfDayISO} to ${endOfDayISO}`);
 
@@ -301,7 +297,7 @@ class Scheduler {
         try {
           // Duplicate check - skip if force mode is on
           if (!force) {
-            const { startISO: todayStartISO } = getUKDateRange(ukNow.year, ukNow.month, ukNow.day);
+            const { startISO: todayStartISO } = getUTCDateRange(utcNow.year, utcNow.month, utcNow.day);
 
             const { data: existing, error: dupError } = await supabase
               .from('messages')

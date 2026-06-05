@@ -164,7 +164,7 @@ router.post('/campaign/start', auth, adminAuth, async (req, res) => {
           .replace(/{leadEmail}/g, lead.email)
           .replace(/{leadPhone}/g, lead.phone)
           .replace(/{companyName}/g, '3D Models')
-          .replace(/{originalContactDate}/g, new Date(lead.created_at).toLocaleDateString());
+          .replace(/{originalContactDate}/g, new Date(lead.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }));
 
         // Send email using messaging service
         const message = {

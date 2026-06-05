@@ -138,13 +138,13 @@ const processTemplate = (template, lead, bookingDate = null) => {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'UTC'
   }) : '';
   const bookingTimeStr = bookingDateTime ? bookingDateTime.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'UTC' // Keep UTC time to match calendar
+    timeZone: 'UTC'
   }) : '';
   
   // Common variables
@@ -155,8 +155,8 @@ const processTemplate = (template, lead, bookingDate = null) => {
     '{bookingDate}': bookingDateStr,
     '{bookingTime}': bookingTimeStr,
     '{companyName}': '3D Models',
-    '{currentDate}': new Date().toLocaleDateString(),
-    '{currentTime}': new Date().toLocaleTimeString()
+    '{currentDate}': new Date().toLocaleDateString('en-GB', { timeZone: 'UTC' }),
+    '{currentTime}': new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' })
   };
   
   // Replace variables in template
@@ -353,11 +353,10 @@ const sendBookingConfirmation = async (lead, appointmentDate) => {
     // Create a concise SMS version
     const bookingDateTime = appointmentDate ? new Date(appointmentDate) : null;
     const bookingDateStr = bookingDateTime ? bookingDateTime.toLocaleDateString('en-GB', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
     }) : '';
     const bookingTimeStr = bookingDateTime ? bookingDateTime.toLocaleTimeString('en-GB', {
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      timeZone: 'UTC' // Keep UTC time to match calendar
+      hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
     }) : '';
 
     // Concise SMS template

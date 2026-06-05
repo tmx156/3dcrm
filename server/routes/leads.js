@@ -1819,7 +1819,7 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
           oldIsConfirmed: lead.is_confirmed,
           newIsConfirmed: req.body.is_confirmed,
           reason: req.body.reschedule_reason || 'Appointment rescheduled',
-          notes: `Appointment rescheduled from ${new Date(oldDateBooked).toLocaleString()} to ${new Date(req.body.date_booked).toLocaleString()}. Status reset: ${lead.booking_status || 'none'} → ${req.body.booking_status || 'none'}`
+          notes: `Appointment rescheduled from ${new Date(oldDateBooked).toLocaleString('en-GB', { timeZone: 'UTC' })} to ${new Date(req.body.date_booked).toLocaleString('en-GB', { timeZone: 'UTC' })}. Status reset: ${lead.booking_status || 'none'} → ${req.body.booking_status || 'none'}`
         },
         createLeadSnapshot(updatedLead)
       );
@@ -1851,7 +1851,7 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
           newStatus: 'Cancelled',
           oldDate: oldDateBooked,
           reason: req.body.cancellation_reason || 'Appointment cancelled via calendar',
-          notes: `Appointment cancelled and lead moved to Cancelled - was scheduled for ${oldDateBooked ? new Date(oldDateBooked).toLocaleString() : 'unknown date'}`
+          notes: `Appointment cancelled and lead moved to Cancelled - was scheduled for ${oldDateBooked ? new Date(oldDateBooked).toLocaleString('en-GB', { timeZone: 'UTC' }) : 'unknown date'}`
         },
         createLeadSnapshot(updatedLead)
       );
@@ -2671,7 +2671,7 @@ router.get('/calendar-public', async (req, res) => {
           status: lead.status,
           date_booked: lead.date_booked,
           booker_id: lead.booker_id,
-          time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
         }
       };
     }) || [];

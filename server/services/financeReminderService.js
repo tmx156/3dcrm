@@ -173,7 +173,7 @@ class FinanceReminderService {
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Due Date:</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB')}</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Remaining Balance:</strong></td>
@@ -235,7 +235,7 @@ class FinanceReminderService {
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Due Date:</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB')}</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Remaining Balance:</strong></td>
@@ -282,7 +282,7 @@ class FinanceReminderService {
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Due Date:</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB')}</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${new Date(agreement.next_payment_date).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Remaining Balance:</strong></td>

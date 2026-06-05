@@ -615,7 +615,7 @@ router.get('/hourly-activity', auth, async (req, res) => {
 
     leads.forEach(lead => {
       if (lead.date_booked) {
-        const bookingHour = new Date(lead.date_booked).getHours();
+        const bookingHour = new Date(lead.date_booked).getUTCHours();
         hourlyData[bookingHour].bookings++;
 
         if (['attended', 'complete'].includes(lead.status?.toLowerCase())) {
@@ -635,7 +635,7 @@ router.get('/hourly-activity', auth, async (req, res) => {
               if (entry.timestamp) {
                 const entryDate = new Date(entry.timestamp);
                 if (entryDate >= startOfDay && entryDate <= endOfDay) {
-                  const entryHour = entryDate.getHours();
+                  const entryHour = entryDate.getUTCHours();
                   if (entry.action?.includes('SMS')) {
                     hourlyData[entryHour].sms++;
                   } else if (entry.action?.includes('CALL')) {
@@ -709,12 +709,14 @@ router.get('/team-performance', auth, async (req, res) => {
           date: appointmentDate.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
-            year: 'numeric'
+            year: 'numeric',
+            timeZone: 'UTC'
           }),
           time: appointmentDate.toLocaleTimeString('en-GB', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false
+            hour12: false,
+            timeZone: 'UTC'
           }),
           status: booking.status || 'Booked',
           dateBooked: booking.date_booked,
@@ -807,7 +809,7 @@ router.get('/calendar-public', async (req, res) => {
         lead_status: lead.status, // Lead status (Booked, Cancelled, etc)
         status: lead.is_confirmed ? 'confirmed' : 'unconfirmed', // Calendar confirmation status
         booking_date: lead.date_booked,
-        booking_time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        booking_time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }),
         booker_id: lead.booker_id,
         created_at: lead.created_at,
         is_confirmed: lead.is_confirmed
