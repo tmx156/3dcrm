@@ -3178,7 +3178,7 @@ const Calendar = () => {
                         <div><b>Payment Method:</b> {selectedSale.paymentMethod}</div>
                         <div><b>Notes:</b> {selectedSale.notes || 'None'}</div>
                         <div><b>Recorded By:</b> {selectedSale.user?.name}</div>
-                        <div><b>Date:</b> {new Date(selectedSale.bookingDate).toLocaleDateString()}</div>
+                        <div><b>Date:</b> {new Date(selectedSale.bookingDate).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</div>
                       </div>
                     </div>
                   )}
@@ -3205,7 +3205,7 @@ const Calendar = () => {
                                 {history.action === 'RESCHEDULE' && 'Appointment Rescheduled'}
                                 {history.action === 'STATUS_CHANGE' && 'Status Changed'}
                                 <span className="ml-2 text-gray-400 font-normal">by {history.performedByName}</span>
-                                <span className="ml-2 text-gray-400 font-normal">{new Date(history.timestamp).toLocaleString()}</span>
+                                <span className="ml-2 text-gray-400 font-normal">{new Date(history.timestamp).toLocaleString('en-GB', { timeZone: 'UTC' })}</span>
                               </div>
                               
                               {history.action === 'NOTES_UPDATED' && history.details && (
@@ -3229,8 +3229,8 @@ const Calendar = () => {
                               {history.action === 'RESCHEDULE' && history.details && (
                                 <div className="text-xs text-gray-600 mt-1">
                                   <div className="bg-orange-50 p-2 rounded">
-                                    <div><span className="font-medium">From:</span> {new Date(history.details.oldDate).toLocaleString()}</div>
-                                    <div><span className="font-medium">To:</span> {new Date(history.details.newDate).toLocaleString()}</div>
+                                    <div><span className="font-medium">From:</span> {new Date(history.details.oldDate).toLocaleString('en-GB', { timeZone: 'UTC' })}</div>
+                                    <div><span className="font-medium">To:</span> {new Date(history.details.newDate).toLocaleString('en-GB', { timeZone: 'UTC' })}</div>
                                   </div>
                                 </div>
                               )}
@@ -3262,7 +3262,7 @@ const Calendar = () => {
                                 {history.action==='EMAIL_RECEIVED' && 'Email Received'}
                                 {history.action==='SMS_SENT' && 'Text Sent'}
                                 {history.action==='SMS_RECEIVED' && 'Text Received'}
-                                <span className="ml-2 text-gray-400 font-normal">{new Date(history.timestamp).toLocaleString()}</span>
+                                <span className="ml-2 text-gray-400 font-normal">{new Date(history.timestamp).toLocaleString('en-GB', { timeZone: 'UTC' })}</span>
                               </div>
                               {history.details?.subject && (
                                 <div className="text-xs text-gray-500 truncate"><b>Subject:</b> {history.details.subject}</div>

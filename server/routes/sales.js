@@ -43,8 +43,8 @@ const sendReceiptEmail = async (sale, lead) => {
         .replace(/{leadName}/g, lead.name || 'Customer')
         .replace(/{companyName}/g, 'Focus Models')
         .replace(/{receiptId}/g, receiptId)
-        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString())
-        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString())
+        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString('en-GB', { timeZone: 'UTC' }))
         .replace(/{saleAmount}/g, sale.amount.toString())
         .replace(/{saleAmountFormatted}/g, `£${sale.amount.toFixed(2)}`)
         .replace(/{paymentMethod}/g, sale.payment_method || 'Unknown')
@@ -56,15 +56,15 @@ const sendReceiptEmail = async (sale, lead) => {
         .replace(/{leadPhone}/g, lead.phone || '')
         .replace(/{companyName}/g, 'Focus Models')
         .replace(/{receiptId}/g, receiptId)
-        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString())
-        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString())
+        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString('en-GB', { timeZone: 'UTC' }))
         .replace(/{saleAmount}/g, sale.amount.toString())
         .replace(/{saleAmountFormatted}/g, `£${sale.amount.toFixed(2)}`)
         .replace(/{paymentMethod}/g, sale.payment_method || 'Unknown')
         .replace(/{paymentType}/g, sale.payment_type || 'full_payment')
         .replace(/{saleNotes}/g, sale.notes ? `\n\nNotes: ${sale.notes}` : '')
-        .replace(/{currentDate}/g, new Date().toLocaleDateString())
-        .replace(/{currentTime}/g, new Date().toLocaleTimeString()),
+        .replace(/{currentDate}/g, new Date().toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{currentTime}/g, new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' })),
         
       sms_body: template.sms_body || ''
     };
@@ -655,8 +655,8 @@ router.post('/:saleId/send-receipt/email', auth, async (req, res) => {
         .replace('{saleAmount}', sale.amount.toString())
         .replace('{saleAmountFormatted}', formattedAmount)
         .replace('{paymentMethod}', sale.payment_method)
-        .replace('{saleDate}', new Date(sale.created_at).toLocaleDateString())
-        .replace('{saleTime}', new Date(sale.created_at).toLocaleTimeString())
+        .replace('{saleDate}', new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace('{saleTime}', new Date(sale.created_at).toLocaleTimeString('en-GB', { timeZone: 'UTC' }))
         .replace('{receiptId}', receiptId)
         .replace('{saleNotes}', sale.notes || '');
 
@@ -670,12 +670,12 @@ router.post('/:saleId/send-receipt/email', auth, async (req, res) => {
         .replace(/{saleAmount}/g, sale.amount.toString())
         .replace(/{saleAmountFormatted}/g, formattedAmount)
         .replace(/{paymentMethod}/g, sale.payment_method)
-        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString())
-        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString())
+        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString('en-GB', { timeZone: 'UTC' }))
         .replace(/{receiptId}/g, receiptId)
         .replace(/{saleNotes}/g, sale.notes || '')
-        .replace(/{currentDate}/g, new Date().toLocaleDateString())
-        .replace(/{currentTime}/g, new Date().toLocaleTimeString());
+        .replace(/{currentDate}/g, new Date().toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{currentTime}/g, new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' }));
     } else {
       // Use default email content
       const formattedAmount = `£${sale.amount.toFixed(2)}`;
@@ -685,7 +685,7 @@ router.post('/:saleId/send-receipt/email', auth, async (req, res) => {
           <h1 style="color: #333;">Thank you for your purchase!</h1>
           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
             <p><strong>Customer:</strong> Customer</p>
-            <p><strong>Date:</strong> ${new Date(sale.created_at).toLocaleDateString()}</p>
+            <p><strong>Date:</strong> ${new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</p>
             <p><strong>Amount:</strong> ${formattedAmount}</p>
             <p><strong>Payment Method:</strong> ${sale.payment_method}</p>
             ${sale.notes ? `<p><strong>Notes:</strong> ${sale.notes}</p>` : ''}
@@ -758,12 +758,12 @@ router.post('/:saleId/send-receipt/sms', auth, async (req, res) => {
         .replace(/{saleAmount}/g, sale.amount.toString())
         .replace(/{saleAmountFormatted}/g, formattedAmount)
         .replace(/{paymentMethod}/g, sale.payment_method)
-        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString())
-        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString())
+        .replace(/{saleDate}/g, new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{saleTime}/g, new Date(sale.created_at).toLocaleTimeString('en-GB', { timeZone: 'UTC' }))
         .replace(/{receiptId}/g, receiptId)
         .replace(/{saleNotes}/g, sale.notes || '')
-        .replace(/{currentDate}/g, new Date().toLocaleDateString())
-        .replace(/{currentTime}/g, new Date().toLocaleTimeString());
+        .replace(/{currentDate}/g, new Date().toLocaleDateString('en-GB', { timeZone: 'UTC' }))
+        .replace(/{currentTime}/g, new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' }));
     } else {
       // Use default SMS content
       const formattedAmount = `£${sale.amount.toFixed(2)}`;
@@ -771,7 +771,7 @@ router.post('/:saleId/send-receipt/sms', auth, async (req, res) => {
       
       smsMessage = `Thank you for your purchase at Modelling Studio CRM!
 Amount: ${formattedAmount}
-Date: ${new Date(sale.created_at).toLocaleDateString()}
+Date: ${new Date(sale.created_at).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
 Receipt ID: ${receiptId}`;
     }
 

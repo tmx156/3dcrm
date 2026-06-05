@@ -1367,9 +1367,9 @@ const LeadDetail = () => {
                                             const minutes = Math.floor(diffMs / (1000 * 60));
                                             return minutes <= 0 ? 'Just now' : `${minutes}m ago`;
                                           } else if (diffHours < 24) {
-                                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                                            return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' });
                                           } else {
-                                            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                                            return date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' });
                                           }
                                         } catch (error) {
                                           return 'Unknown time';
@@ -1641,10 +1641,11 @@ const LeadDetail = () => {
                                   const days = Math.floor(diffDays);
                                   return `${days} day${days === 1 ? '' : 's'} ago`;
                                 } else {
-                                  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {
+                                  return date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) + ' ' + date.toLocaleTimeString('en-GB', {
                                     hour: '2-digit',
                                     minute: '2-digit',
-                                    hour12: true
+                                    hour12: true,
+                                    timeZone: 'UTC'
                                   });
                                 }
                               } catch (error) {

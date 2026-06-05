@@ -41,7 +41,7 @@ const MessageHistory = ({ bookingHistory, title = "Message History", maxHeight =
                 {history.action==='SMS_SENT' && 'Text Sent'}
                 {history.action==='SMS_RECEIVED' && 'Text Received'}
                 <span className="ml-2 text-gray-400 font-normal">
-                  {new Date(history.timestamp).toLocaleString()}
+                  {new Date(history.timestamp).toLocaleString('en-GB', { timeZone: 'UTC' })}
                 </span>
               </div>
               {history.details?.subject && (

@@ -114,7 +114,7 @@ const CalendarPerformanceOptimizations = ({
                       <label className="text-sm font-medium text-gray-500">Booked Date</label>
                       <p className="text-sm text-gray-900">
                         {selectedEvent.lead.date_booked
-                          ? new Date(selectedEvent.lead.date_booked).toLocaleString()
+                          ? new Date(selectedEvent.lead.date_booked).toLocaleString('en-GB', { timeZone: 'UTC' })
                           : 'Not scheduled'
                         }
                       </p>

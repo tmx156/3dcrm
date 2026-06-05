@@ -327,16 +327,18 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
         });
       } else if (diffDays < 7) {
         const days = Math.floor(diffDays);
-        return `${days} day${days === 1 ? '' : 's'} ago at ${date.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          hour12: true 
+        return `${days} day${days === 1 ? '' : 's'} ago at ${date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'UTC'
         })}`;
       } else {
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          hour12: true 
+        return date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) + ' ' + date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'UTC' 
         });
       }
     } catch (error) {

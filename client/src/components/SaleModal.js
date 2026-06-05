@@ -288,7 +288,7 @@ const SaleModal = ({ isOpen, onClose, lead, existingSale, onSaveSuccess }) => {
                 <span className="font-medium">Phone:</span> {lead.phone}
               </div>
               <div>
-                <span className="font-medium">Booking Date:</span> {new Date(lead.dateBooked).toLocaleDateString()}
+                <span className="font-medium">Booking Date:</span> {new Date(lead.dateBooked).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
               </div>
             </div>
           </div>

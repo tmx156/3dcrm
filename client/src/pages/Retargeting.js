@@ -135,7 +135,7 @@ const Retargeting = () => {
       .replace(/{leadEmail}/g, lead.email)
       .replace(/{leadPhone}/g, lead.phone)
       .replace(/{companyName}/g, 'Modelling Studio CRM')
-      .replace(/{originalContactDate}/g, new Date(lead.createdAt).toLocaleDateString());
+      .replace(/{originalContactDate}/g, new Date(lead.createdAt).toLocaleDateString('en-GB', { timeZone: 'UTC' }));
 
     return { subject, body };
   };
