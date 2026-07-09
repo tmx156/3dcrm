@@ -1130,7 +1130,14 @@ router.post('/', auth, async (req, res) => {
           is_confirmed: bodyWithoutId.is_confirmed ? 1 : 0,
           booking_status: bodyWithoutId.booking_status || (isReschedule ? 'Reschedule' : null)
         };
-        
+
+        // ✅ DAILY ACTIVITY FIX: Set booked_at timestamp when this lead becomes Booked for the first time
+        // (this is the primary "book an existing lead" path used by the Calendar page)
+        if (existingLeads[0].status !== 'Booked') {
+          updateData.booked_at = new Date().toISOString();
+          updateData.ever_booked = true;
+        }
+
         const updateResult = await dbManager.update('leads', updateData, { id: _id });
         
         // Get updated lead
