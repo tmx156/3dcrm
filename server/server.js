@@ -455,6 +455,8 @@ app.use('/api/legacy', legacyRoutes);
 app.use('/api/booker-analytics', bookerAnalyticsRoutes);
 app.use('/api/email-test', emailTestRoutes);
 app.use('/api/gmail', gmailAuthRoutes);
+// Alias so the redirect URI registered in Google Cloud (/oauth2callback) also works
+app.get('/oauth2callback', gmailAuthRoutes.handleCallback);
 app.use('/api/google-sheets', googleSheetsRoutes);
 app.use('/api/webhook', webhookRoutes);
 // TEMPORARILY DISABLED: app.use('/api/performance', require('./routes/performance'));

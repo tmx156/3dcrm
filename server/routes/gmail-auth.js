@@ -42,7 +42,7 @@ router.get('/auth-url', (req, res) => {
  * Google redirects here after the user consents.
  * Exchanges the code for tokens and stores them in Supabase.
  */
-router.get('/callback', async (req, res) => {
+async function handleCallback(req, res) {
   const { code, error: oauthError, error_description } = req.query;
   
   console.log('[Gmail] Callback received:', { 
@@ -56,7 +56,15 @@ router.get('/callback', async (req, res) => {
     return res.status(400).send(`OAuth Error: ${oauthError} - ${error_description || 'No description'}`);
   }
   
-  if (!code) return res.status(400).send('Missing code parameter');
+  if (!code) {
+    // Reached without a code: almost always someone opening this URL directly.
+    // It is the address Google redirects *to*; the flow starts at /api/gmail/auth-url.
+    return res.status(400).send(
+      'This page is the OAuth redirect target, not the starting point — ' +
+      'Google calls it with a ?code= parameter.<br><br>' +
+      'Start the flow here instead: <a href="/api/gmail/auth-url">/api/gmail/auth-url</a>'
+    );
+  }
 
   try {
     const oauth2 = makeOAuth2Client();
@@ -130,6 +138,9 @@ router.get('/callback', async (req, res) => {
     console.error('[Gmail] Full error:', err);
     res.status(500).send('OAuth error: ' + err.message + '<br><br>If this persists, try running: node server/gmail_manual_auth.js');
   }
-});
+}
+
+router.get('/callback', handleCallback);
 
 module.exports = router;
+module.exports.handleCallback = handleCallback;
