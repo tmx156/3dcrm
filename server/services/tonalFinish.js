@@ -177,13 +177,16 @@ async function whiteSweepGain(rgb, w, h) {
     weight[i] = inMask[i] ? 255 : 0;
     for (let c = 0; c < 3; c++) masked[c][i] = inMask[i] ? small[i * 3 + c] : 0;
   }
-  const blur = (buf) => sharp(buf, { raw: { width: LW, height: lh, channels: 1 } }).blur(sigma).raw().toBuffer();
+  // extractChannel(0) on every single-channel buffer in this file: sharp hands
+  // a 1-channel raw input back as 3 channels after blur/resize, and reading
+  // that as one channel samples the wrong pixels - it striped every retouch.
+  const blur = (buf) => sharp(buf, { raw: { width: LW, height: lh, channels: 1 } }).blur(sigma).extractChannel(0).raw().toBuffer();
   const [bR, bG, bB, bW] = await Promise.all([...masked.map(blur), blur(weight)]);
   const bC = [bR, bG, bB];
 
   // Feathered mask for blending the gain in and out
   const feather = await sharp(Buffer.from(inMask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
-    .blur(1.5).raw().toBuffer();
+    .blur(1.5).extractChannel(0).raw().toBuffer();
 
   const gain = Buffer.alloc(N * 3);
   for (let i = 0; i < N; i++) {
@@ -247,7 +250,7 @@ async function backdropMask(rgb, w, h) {
     }
   }
   return sharp(Buffer.from(mask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
-    .blur(1.2).resize(w, h, { fit: 'fill' }).raw().toBuffer();
+    .blur(1.2).resize(w, h, { fit: 'fill' }).extractChannel(0).raw().toBuffer();
 }
 
 async function cameraTexture(rgb, w, h) {
@@ -260,7 +263,7 @@ async function cameraTexture(rgb, w, h) {
     noise[i] = clamp(Math.round(128 + g * 40), 0, 255);
   }
   // A touch of blur so it reads as sensor grain, not digital speckle
-  const grain = await sharp(noise, { raw: { width: w, height: h, channels: 1 } }).blur(0.55).raw().toBuffer();
+  const grain = await sharp(noise, { raw: { width: w, height: h, channels: 1 } }).blur(0.55).extractChannel(0).raw().toBuffer();
   const amp = 7.5 * GRAIN;
   for (let i = 0, k = 0; i < grain.length; i++, k += 3) {
     const L = lum(rgb[k], rgb[k + 1], rgb[k + 2]) / 255;
