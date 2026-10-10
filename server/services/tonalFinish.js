@@ -27,6 +27,22 @@
 
 const sharp = require('sharp');
 
+/**
+ * Raw pixels with their layout checked. Every buffer here is indexed by hand
+ * as (y * w + x) * channels, so a buffer with a different channel count or
+ * size than assumed reads the wrong pixels and stripes the whole photo. A
+ * mismatch throws instead; editImage then keeps the model's result as is.
+ */
+async function rawOf(pipeline, width, height, channels) {
+  const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
+  if (info.width !== width || info.height !== height || info.channels !== channels ||
+      data.length !== width * height * channels) {
+    throw new Error(`raw buffer is ${info.width}x${info.height}x${info.channels}, ` +
+      `expected ${width}x${height}x${channels}`);
+  }
+  return data;
+}
+
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 const chroma = (r, g, b) => Math.max(r, g, b) - Math.min(r, g, b);
@@ -127,8 +143,8 @@ function shadowLut(blackPoint) {
 async function whiteSweepGain(rgb, w, h) {
   const LW = 320;
   const lh = Math.max(8, Math.round(h * LW / w));
-  const small = await sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
-    .resize(LW, lh, { fit: 'fill' }).raw().toBuffer();
+  const small = await rawOf(sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
+    .resize(LW, lh, { fit: 'fill' }), LW, lh, 3);
 
   const N = LW * lh;
   const L = new Float32Array(N), C = new Float32Array(N);
@@ -180,13 +196,13 @@ async function whiteSweepGain(rgb, w, h) {
   // extractChannel(0) on every single-channel buffer in this file: sharp hands
   // a 1-channel raw input back as 3 channels after blur/resize, and reading
   // that as one channel samples the wrong pixels - it striped every retouch.
-  const blur = (buf) => sharp(buf, { raw: { width: LW, height: lh, channels: 1 } }).blur(sigma).extractChannel(0).raw().toBuffer();
+  const blur = (buf) => rawOf(sharp(buf, { raw: { width: LW, height: lh, channels: 1 } }).blur(sigma).extractChannel(0), LW, lh, 1);
   const [bR, bG, bB, bW] = await Promise.all([...masked.map(blur), blur(weight)]);
   const bC = [bR, bG, bB];
 
   // Feathered mask for blending the gain in and out
-  const feather = await sharp(Buffer.from(inMask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
-    .blur(1.5).extractChannel(0).raw().toBuffer();
+  const feather = await rawOf(sharp(Buffer.from(inMask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
+    .blur(1.5).extractChannel(0), LW, lh, 1);
 
   const gain = Buffer.alloc(N * 3);
   for (let i = 0; i < N; i++) {
@@ -202,8 +218,8 @@ async function whiteSweepGain(rgb, w, h) {
   }
 
   // Three channels, interleaved like the image itself
-  return sharp(gain, { raw: { width: LW, height: lh, channels: 3 } })
-    .resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer();
+  return rawOf(sharp(gain, { raw: { width: LW, height: lh, channels: 3 } })
+    .resize(w, h, { fit: 'fill', kernel: 'cubic' }), w, h, 3);
 }
 
 /**
@@ -227,8 +243,8 @@ const GRAIN = parseFloat(process.env.PHOTO_GRAIN_STRENGTH || '0');
 async function backdropMask(rgb, w, h) {
   const LW = 320;
   const lh = Math.max(8, Math.round(h * LW / w));
-  const small = await sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
-    .resize(LW, lh, { fit: 'fill' }).blur(0.8).raw().toBuffer();
+  const small = await rawOf(sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
+    .resize(LW, lh, { fit: 'fill' }).blur(0.8), LW, lh, 3);
   const N = LW * lh;
   const mask = new Uint8Array(N);
   const queue = [];
@@ -249,8 +265,8 @@ async function backdropMask(rgb, w, h) {
       if (!mask[j] && diff(i, j) <= 4) { mask[j] = 1; queue.push(j); }
     }
   }
-  return sharp(Buffer.from(mask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
-    .blur(1.2).resize(w, h, { fit: 'fill' }).extractChannel(0).raw().toBuffer();
+  return rawOf(sharp(Buffer.from(mask.map(v => v * 255)), { raw: { width: LW, height: lh, channels: 1 } })
+    .blur(1.2).resize(w, h, { fit: 'fill' }).extractChannel(0), w, h, 1);
 }
 
 async function cameraTexture(rgb, w, h) {
@@ -263,7 +279,7 @@ async function cameraTexture(rgb, w, h) {
     noise[i] = clamp(Math.round(128 + g * 40), 0, 255);
   }
   // A touch of blur so it reads as sensor grain, not digital speckle
-  const grain = await sharp(noise, { raw: { width: w, height: h, channels: 1 } }).blur(0.55).extractChannel(0).raw().toBuffer();
+  const grain = await rawOf(sharp(noise, { raw: { width: w, height: h, channels: 1 } }).blur(0.55).extractChannel(0), w, h, 1);
   const amp = 7.5 * GRAIN;
   for (let i = 0, k = 0; i < grain.length; i++, k += 3) {
     const L = lum(rgb[k], rgb[k + 1], rgb[k + 2]) / 255;
@@ -300,6 +316,9 @@ async function finishTones(buffer, { sourceBackdrop = null, format = 'jpeg', tar
   const { data, info } = await pipeline.removeAlpha().toColourspace('srgb')
     .raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h } = info;
+  if (info.channels !== 3 || data.length !== w * h * 3) {
+    throw new Error(`expected 3-channel sRGB, got ${info.channels} channels`);
+  }
   const out = Buffer.from(data);
   const applied = { kind };
 
