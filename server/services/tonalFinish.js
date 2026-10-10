@@ -367,4 +367,35 @@ async function finishTones(buffer, { sourceBackdrop = null, format = 'jpeg', tar
   return { buffer: encoded, kind, applied };
 }
 
-module.exports = { finishTones, classifyBackdrop };
+/**
+ * How much horizontal striping `candidate` has that `reference` did not.
+ *
+ * Both are compared at the candidate's size: the per-row mean of
+ * (candidate - reference) is taken, and each row is compared with the rows 4
+ * above and below. Retouching, tone curves and backdrop lifts change rows
+ * smoothly and score near 0; lines across the frame lift alternate rows and
+ * score high. The median keeps a real edge in the picture (a shoulder line,
+ * a chin) from counting - it moves only a handful of rows, stripes move all.
+ *
+ * Measured: clean finish 0.00-0.07, clean retouch vs its source ~0.16,
+ * the striped retouches 0.65-1.5.
+ */
+async function stripeScore(reference, candidate) {
+  const { width: w, height: h } = await sharp(candidate).metadata();
+  const grey = (buf) => rawOf(sharp(buf).rotate().resize(w, h, { fit: 'fill' })
+    .greyscale().extractChannel(0), w, h, 1);
+  const [a, b] = await Promise.all([grey(reference), grey(candidate)]);
+  const rows = new Float64Array(h);
+  for (let y = 0; y < h; y++) {
+    let s = 0;
+    for (let x = 0; x < w; x++) s += b[y * w + x] - a[y * w + x];
+    rows[y] = s / w;
+  }
+  const jumps = [];
+  for (let y = 4; y < h - 4; y++) jumps.push(Math.abs(rows[y] - (rows[y - 4] + rows[y + 4]) / 2));
+  if (!jumps.length) return 0;
+  jumps.sort((p, q) => p - q);
+  return jumps[Math.floor(jumps.length / 2)];
+}
+
+module.exports = { finishTones, classifyBackdrop, stripeScore };
