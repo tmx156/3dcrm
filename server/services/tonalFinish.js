@@ -328,8 +328,9 @@ async function finishTones(buffer, { sourceBackdrop = null, format = 'jpeg', tar
     const meta = await sharp(buffer).metadata();
     if (meta.width !== targetSize.width || meta.height !== targetSize.height) {
       pipeline = pipeline
-        .resize(targetSize.width, targetSize.height, { fit: 'fill', kernel: 'lanczos3' })
-        .sharpen({ sigma: 0.7, m1: 0.5, m2: 1.0 });
+        // No sharpening after the upscale: it etched faint skin creases from
+        // the model into hard lines across foreheads on close-ups
+        .resize(targetSize.width, targetSize.height, { fit: 'fill', kernel: 'lanczos3' });
     }
   }
   const { data, info } = await pipeline.removeAlpha().toColourspace('srgb')

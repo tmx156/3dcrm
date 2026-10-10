@@ -315,7 +315,8 @@ const PRESETS = {
       'sophisticated, high-end colour grade suited to this particular ' +
       'photograph. Keep hands, fingers, limbs, face, jaw, neck and body ' +
       'proportions realistic, and keep the image free of generation ' +
-      'artifacts - no smeared or melted textures, no garbled lace or ' +
+      'artifacts - no thin etched lines, scratches or streaks drawn across ' +
+      'the skin or forehead, no smeared or melted textures, no garbled lace or ' +
       'patterns, no blotchy or muddy patches, no warped anatomy, extra or fused fingers, ' +
       'stretched features or altered facial identity. Keep the head angle, ' +
       'the direction the face is turned, whether the eyes are open or closed, ' +
