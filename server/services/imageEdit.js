@@ -287,8 +287,10 @@ const PRESETS = {
       'and character still there. Do this however small the face is in the ' +
       'frame and whichever way up it is. ' +
       "Keep the person's own natural skin tone - do not tan, bronze or " +
-      'orange the skin. Clean up distracting flyaway hairs while keeping the ' +
-      'natural hair texture and hairstyle. Retouch any visible neck, ' +
+      'orange the skin. Remove only the few stray hairs that cross the face ' +
+      'or eyes; keep the natural soft, fine wisps along the outline of the ' +
+      'hair so the hairline and edges look real, never cut out or helmet-' +
+      'smooth. Keep the natural hair texture and hairstyle. Retouch any visible neck, ' +
       'decolletage, arms, hands and legs to match. On the neck and ' +
       'decolletage, fully smooth out the lines, folds, creases and crepey ' +
       'texture so that skin looks smooth and youthful like the face - this is ' +

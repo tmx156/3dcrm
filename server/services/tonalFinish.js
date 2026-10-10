@@ -43,6 +43,9 @@ async function rawOf(pipeline, width, height, channels) {
   return data;
 }
 
+// Where the white sweep lands the paper (see whiteSweepGain).
+const SWEEP_TARGET = 250;
+
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 const chroma = (r, g, b) => Math.max(r, g, b) - Math.min(r, g, b);
@@ -95,12 +98,18 @@ function lumPercentile(data, p) {
  * alone; only the top end is pulled up, so a grey-ish white set becomes
  * white without the whole photo going flat and bright.
  */
-function highlightLut(whitePoint) {
+function highlightLut(whitePoint, landAt = 255) {
   const wp = clamp(whitePoint, 180, 255);
+  const land = clamp(landAt, wp, 255);
   const knee = wp * 0.62;
   const lut = new Uint8ClampedArray(256);
   for (let x = 0; x < 256; x++) {
-    lut[x] = x <= knee ? x : Math.round(knee + (x - knee) * (255 - knee) / (wp - knee));
+    if (x <= knee) lut[x] = x;
+    else if (x <= wp) lut[x] = Math.round(knee + (x - knee) * (land - knee) / (wp - knee));
+    // Shoulder: tones brighter than the white point (a white shirt against a
+    // greyish set) are eased into the top few levels instead of clipped, so
+    // the shirt keeps its folds and its outline against the backdrop.
+    else lut[x] = Math.round(land + (x - wp) * (255 - land) / Math.max(1, 255 - wp));
   }
   return lut;
 }
@@ -139,25 +148,33 @@ function shadowLut(blackPoint) {
  *
  * Worked out at low resolution and applied as a smooth gain map, so it
  * cannot introduce edges of its own.
+ *
+ * The region is found on `maskRgb` - the photo before the highlight curve -
+ * and nothing brighter than `ceiling` there joins it. On a greyish white set
+ * the subject's white shirt is brighter than the paper; without the ceiling
+ * the fill crept into the shirt and the gain bleached it into the backdrop,
+ * so the person lost their outline and looked pasted on.
  */
-async function whiteSweepGain(rgb, w, h) {
+async function whiteSweepGain(rgb, w, h, { maskRgb = rgb, ceiling = 255, floor = 150 } = {}) {
   const LW = 320;
   const lh = Math.max(8, Math.round(h * LW / w));
-  const small = await rawOf(sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
+  const shrink = (buf) => rawOf(sharp(buf, { raw: { width: w, height: h, channels: 3 } })
     .resize(LW, lh, { fit: 'fill' }), LW, lh, 3);
+  const small = await shrink(rgb);
+  const smallMask = maskRgb === rgb ? small : await shrink(maskRgb);
 
   const N = LW * lh;
   const L = new Float32Array(N), C = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const k = i * 3;
-    L[i] = lum(small[k], small[k + 1], small[k + 2]);
-    C[i] = chroma(small[k], small[k + 1], small[k + 2]);
+    L[i] = lum(smallMask[k], smallMask[k + 1], smallMask[k + 2]);
+    C[i] = chroma(smallMask[k], smallMask[k + 1], smallMask[k + 2]);
   }
 
   // Region grow from bright, neutral pixels along the top and both sides.
   const inMask = new Uint8Array(N);
   const queue = [];
-  const seedOk = (i) => L[i] >= 225 && C[i] <= 16;
+  const seedOk = (i) => L[i] >= Math.min(225, ceiling - 20) && L[i] <= ceiling && C[i] <= 16;
   for (let x = 0; x < LW; x++) for (let y = 0; y < Math.round(lh * 0.1); y++) {
     const i = y * LW + x; if (seedOk(i) && !inMask[i]) { inMask[i] = 1; queue.push(i); }
   }
@@ -174,7 +191,7 @@ async function whiteSweepGain(rgb, w, h) {
       if (inMask[j]) continue;
       // Neutral, not dark, and no hard edge between the two pixels - that is
       // what stops the fill at a white shirt's outline or the edge of a box.
-      if (L[j] >= 150 && C[j] <= 18 && Math.abs(L[j] - L[i]) <= 5) { inMask[j] = 1; queue.push(j); }
+      if (L[j] >= floor && L[j] <= ceiling && C[j] <= 18 && Math.abs(L[j] - L[i]) <= 5) { inMask[j] = 1; queue.push(j); }
     }
   }
 
@@ -209,9 +226,11 @@ async function whiteSweepGain(rgb, w, h) {
     const m = feather[i] / 255;
     for (let c = 0; c < 3; c++) {
       const shading = bW[i] > 8 ? (bC[c][i] * 255) / bW[i] : 255;
-      // Aim a touch past white so the paper clips clean - any faint banding
-      // the model left in it disappears, as it did with the old global curve
-      const g = clamp(260 / Math.max(shading, 1), 1, 1.45);
+      // Near-white, not clipped: a real high-key set reads as clean white but
+      // still has a breath of tone, which is what lets a white shirt or pale
+      // skin keep its edge against it. Clipping it to 255 made people look
+      // cut out and pasted onto the page.
+      const g = clamp(SWEEP_TARGET / Math.max(shading, 1), 1, 1.45);
       // Stored as (gain - 1) * 400 in a byte for the resize
       gain[i * 3 + c] = Math.round(clamp((g - 1) * m * 400, 0, 255));
     }
@@ -328,10 +347,17 @@ async function finishTones(buffer, { sourceBackdrop = null, format = 'jpeg', tar
     // any tint on the paper is taken out by the backdrop-only sweep below.
     // White point at the paper's LOWEST channel, so all three clip to white
     // and any banding the model left in the paper goes with it
-    const lut = highlightLut(Math.min(bd.r, bd.g, bd.b, 252) - 2);
+    // The paper lands just short of white here; the sweep below takes the
+    // paper (and only the paper) the rest of the way.
+    const lut = highlightLut(Math.min(bd.r, bd.g, bd.b, 252) - 2, 246);
     const deep = shadowLut(Math.min(lumPercentile(data, 0.002), 14));
     for (let k = 0; k < out.length; k++) out[k] = deep[lut[out[k]]];
-    const gain = await whiteSweepGain(out, w, h);
+    // Anything clearly brighter than the paper - a white shirt, a white top -
+    // is the subject, not backdrop, and is kept out of the sweep.
+    // ...and so is anything far darker - the shadowed side of that shirt is
+    // neutral grey too, and lifting it flattened the shirt's folds.
+    const paperL = lum(bd.r, bd.g, bd.b);
+    const gain = await whiteSweepGain(out, w, h, { maskRgb: data, ceiling: paperL + 7, floor: Math.max(150, paperL - 30) });
     if (gain) {
       for (let k = 0; k < gain.length; k++) {
         if (gain[k]) out[k] = clamp(Math.round(out[k] * (1 + gain[k] / 400)), 0, 255);
