@@ -16,21 +16,31 @@ const dbManager = require('./database-connection-manager');
 
 // Backward compatibility: Set environment variables from config
 // This ensures existing code still works during transition
-process.env.BULKSMS_USERNAME = config.sms.username;
-process.env.BULKSMS_PASSWORD = config.sms.password;
-process.env.BULKSMS_FROM_NUMBER = config.sms.fromNumber;
-process.env.BULKSMS_POLL_ENABLED = config.sms.pollEnabled.toString();
-process.env.BULKSMS_POLL_INTERVAL_MS = config.sms.pollInterval.toString();
+// NOTE: assigning null/undefined to process.env stringifies it to "null"/"undefined",
+// which makes a missing credential look configured. Only copy real values across.
+const setEnvFromConfig = (key, value) => {
+  if (value === null || value === undefined || value === '') {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = String(value);
+};
 
-process.env.EMAIL_USER = config.email.user;
-process.env.EMAIL_PASSWORD = config.email.password;
-process.env.GMAIL_USER = config.email.gmailUser;
-process.env.GMAIL_PASS = config.email.gmailPass;
+setEnvFromConfig('BULKSMS_USERNAME', config.sms.username);
+setEnvFromConfig('BULKSMS_PASSWORD', config.sms.password);
+setEnvFromConfig('BULKSMS_FROM_NUMBER', config.sms.fromNumber);
+setEnvFromConfig('BULKSMS_POLL_ENABLED', config.sms.pollEnabled.toString());
+setEnvFromConfig('BULKSMS_POLL_INTERVAL_MS', config.sms.pollInterval.toString());
+
+setEnvFromConfig('EMAIL_USER', config.email.user);
+setEnvFromConfig('EMAIL_PASSWORD', config.email.password);
+setEnvFromConfig('GMAIL_USER', config.email.gmailUser);
+setEnvFromConfig('GMAIL_PASS', config.email.gmailPass);
 
 // Set environment variables programmatically (backward compatibility)
-process.env.SUPABASE_URL = config.supabase.url;
-process.env.SUPABASE_ANON_KEY = config.supabase.anonKey;
-process.env.JWT_SECRET = config.JWT_SECRET;
+setEnvFromConfig('SUPABASE_URL', config.supabase.url);
+setEnvFromConfig('SUPABASE_ANON_KEY', config.supabase.anonKey);
+setEnvFromConfig('JWT_SECRET', config.JWT_SECRET);
 
 // Database configuration - Now using centralized config
 const { createClient } = require('@supabase/supabase-js');
@@ -51,6 +61,8 @@ const uploadRoutes = require('./routes/upload');
 const smsRoutes = require('./routes/sms');
 const legacyRoutes = require('./routes/legacy');
 const bookerAnalyticsRoutes = require('./routes/booker-analytics');
+const bookerPerformanceRoutes = require('./routes/booker-performance');
+const leadAnalyticsRoutes = require('./routes/lead-analytics');
 const emailTestRoutes = require('./routes/email-test');
 const gmailAuthRoutes = require('./routes/gmail-auth');
 const webhookRoutes = require('./routes/webhook');
@@ -59,6 +71,12 @@ const scheduler = require('./utils/scheduler');
 const { startGmailPoller } = require('./utils/gmailPoller');
 const { startGoogleSheetsSync } = require('./utils/googleSheetsSync');
 const googleSheetsRoutes = require('./routes/google-sheets');
+const photoRoutes = require('./routes/photos');
+const photoDeliveryRoutes = require('./routes/photo-delivery');
+const photoEditRoutes = require('./routes/photo-edit');
+const retouchQueue = require('./services/retouchQueue');
+const trackingRoutes = require('./routes/tracking');
+const { publicBaseUrl } = require('./utils/emailTracking');
 const FinanceReminderService = require('./services/financeReminderServiceSupabase');
 // Removed legacy auto-sync import to avoid accidental background duplication
 let startUltraFastSMSPolling = () => {};
@@ -453,12 +471,28 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/legacy', legacyRoutes);
 app.use('/api/booker-analytics', bookerAnalyticsRoutes);
+app.use('/api/booker-performance', bookerPerformanceRoutes);
+app.use('/api/lead-analytics', leadAnalyticsRoutes);
 app.use('/api/email-test', emailTestRoutes);
 app.use('/api/gmail', gmailAuthRoutes);
 // Alias so the redirect URI registered in Google Cloud (/oauth2callback) also works
 app.get('/oauth2callback', gmailAuthRoutes.handleCallback);
 app.use('/api/google-sheets', googleSheetsRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/photos', photoRoutes);
+app.use('/api/photo-delivery', photoDeliveryRoutes);
+app.use('/api/photo-edit', photoEditRoutes);
+// Auto-retouch lives in-process, so a restart can strand 'running' edit rows.
+retouchQueue.recoverStale();
+// And pick up photos a restart (e.g. a deploy mid-upload) dropped before they
+// started. Delayed so it runs once the server and sockets are up.
+setTimeout(() => retouchQueue.resumeOnBoot(), 10000);
+// Public: hit by mail clients (open pixel) and by clients downloading their
+// photos, neither of which carries an auth token.
+app.use('/api/track', trackingRoutes);
+// Public: the client photo gallery behind the "View your photos" email button.
+// Must stay above the React catch-all at the bottom of this file.
+app.use('/gallery', require('./routes/gallery'));
 // TEMPORARILY DISABLED: app.use('/api/performance', require('./routes/performance'));
 
 // Scheduler API - manual trigger + status
@@ -561,8 +595,8 @@ app.post('/api/short/sms', async (req, res) => {
       return res.status(500).json({ error: 'SHORT_LINK_ERROR', message: 'Database error' });
     }
     
-    const base = process.env.PUBLIC_BASE_URL || 'http://localhost:5000';
-    return res.json({ id, url: `${base}/c/${id}` });
+    // Sent to clients, so it must be the public address, not localhost.
+    return res.json({ id, url: `${publicBaseUrl()}/c/${id}` });
   } catch (err) {
     console.error('❌ Failed to create short link:', err?.message || err);
     return res.status(500).json({ error: 'SHORT_LINK_ERROR' });

@@ -21,6 +21,53 @@ const supabase = getSupabaseClient();
 
 const router = express.Router();
 
+// "On The Way" ETA lives in leads.eta_at (migrations/add-lead-eta.sql). Until that
+// migration has been run the column does not exist, and naming it in a select or an
+// update makes Supabase reject the whole query - which would blank the calendar. So
+// probe for it once and only use it when present; a miss is re-checked every 5 min
+// so the feature switches on by itself shortly after the migration is applied.
+let etaColumnState = { available: false, checkedAt: 0 };
+const hasEtaColumn = async () => {
+  if (etaColumnState.available) return true;
+  if (Date.now() - etaColumnState.checkedAt < 5 * 60 * 1000) return false;
+  const { error } = await supabase.from('leads').select('eta_at').limit(1);
+  etaColumnState = { available: !error, checkedAt: Date.now() };
+  if (error) console.warn('⚠️ leads.eta_at missing - run migrations/add-lead-eta.sql to enable On The Way ETAs');
+  return !error;
+};
+
+// Model stats (height, measurements, eyes, hair, DOB) shown on the calendar's
+// appointment card. Same approach as eta_at above: the columns are looked for
+// rather than assumed, because naming a column that does not exist yet fails
+// the whole calendar query, not just the card. Until
+// migrations/add-model-stats-columns.sql is run the card simply stays empty.
+const MODEL_STATS_COLUMNS = [
+  'date_of_birth', 'height_inches', 'chest_inches', 'waist_inches',
+  'hips_inches', 'eye_color', 'hair_color', 'hair_length'
+];
+let modelStatsColumnState = { available: false, checkedAt: 0 };
+const hasModelStatsColumns = async () => {
+  if (modelStatsColumnState.available) return true;
+  if (Date.now() - modelStatsColumnState.checkedAt < 5 * 60 * 1000) return false;
+  const { error } = await supabase.from('leads').select(MODEL_STATS_COLUMNS.join(', ')).limit(1);
+  modelStatsColumnState = { available: !error, checkedAt: Date.now() };
+  if (error) console.warn('⚠️ leads model stats columns missing - run migrations/add-model-stats-columns.sql');
+  return !error;
+};
+
+// Recipient open tracking on messages (migrations/add-photos-and-read-receipts.sql).
+// Same approach again: until it has run, naming the columns would fail the lead's
+// whole message list, so they are only selected once present.
+let openColumnState = { available: false, checkedAt: 0 };
+const hasOpenTrackingColumns = async () => {
+  if (openColumnState.available) return true;
+  if (Date.now() - openColumnState.checkedAt < 5 * 60 * 1000) return false;
+  const { error } = await supabase.from('messages').select('opened_at, last_opened_at, open_count').limit(1);
+  openColumnState = { available: !error, checkedAt: Date.now() };
+  if (error) console.warn('⚠️ messages open-tracking columns missing - run migrations/add-photos-and-read-receipts.sql');
+  return !error;
+};
+
 // TIMEZONE FIX: Helper function to preserve local time when saving to database
 const preserveLocalTime = (dateString) => {
   if (!dateString) return null;
@@ -536,6 +583,10 @@ router.get('/', auth, async (req, res) => {
 // @access  Private (All logged-in users - special endpoint for calendar)
 router.get('/calendar', auth, async (req, res) => {
   try {
+    const etaSelect = (await hasEtaColumn()) ? ' eta_at,' : '';
+    // Authenticated calendar only - deliberately NOT added to /calendar-public,
+    // which has no login and must not expose dates of birth or measurements.
+    const statsSelect = (await hasModelStatsColumns()) ? ' ' + MODEL_STATS_COLUMNS.join(', ') + ',' : '';
     console.log(`📅 Calendar API: Fetching events for user ${req.user.name} (${req.user.role})`);
 
     // PERFORMANCE: Get pagination and date range from query params
@@ -583,7 +634,7 @@ router.get('/calendar', auth, async (req, res) => {
           .from('leads')
           .select(`
             id, name, phone, email, age, status, date_booked, booker_id,
-            is_confirmed, booking_status, has_sale,
+            is_confirmed, booking_status, has_sale,${etaSelect}${statsSelect}
             created_at, updated_at, postcode, notes, image_url
           `)
           .or('date_booked.not.is.null,status.eq.Booked')
@@ -687,7 +738,7 @@ router.get('/calendar', auth, async (req, res) => {
           .from('leads')
           .select(`
             id, name, phone, email, age, status, date_booked, booker_id,
-            is_confirmed, booking_status, has_sale,
+            is_confirmed, booking_status, has_sale,${etaSelect}${statsSelect}
             created_at, updated_at, postcode, notes, image_url
           `)
           .not('date_booked', 'is', null)
@@ -830,9 +881,10 @@ router.get('/:id([0-9a-fA-F-]{36})/messages', auth, async (req, res) => {
     const leadId = req.params.id;
     const { type } = req.query;
 
+    const openSelect = (await hasOpenTrackingColumns()) ? ', opened_at, last_opened_at, open_count' : '';
     let query = supabase
       .from('messages')
-      .select('id, lead_id, type, content, sms_body, email_body, subject, recipient_email, sent_by, sent_by_name, status, email_status, read_status, delivery_status, error_message, attachments, sent_at, created_at')
+      .select(`id, lead_id, type, content, sms_body, email_body, subject, recipient_email, sent_by, sent_by_name, status, email_status, read_status, delivery_status, error_message, attachments, sent_at, created_at${openSelect}`)
       .eq('lead_id', leadId)
       .order('created_at', { ascending: true });
 
@@ -1124,7 +1176,6 @@ router.post('/', auth, async (req, res) => {
           ...cleanBodyData,
           date_booked: bodyWithoutId.date_booked ? preserveLocalTime(bodyWithoutId.date_booked) : null,
           status: 'Booked',
-          booker_id: req.user.id,
           updated_at: new Date().toISOString(),
           // Convert boolean to integer for database compatibility
           is_confirmed: bodyWithoutId.is_confirmed ? 1 : 0,
@@ -1136,6 +1187,12 @@ router.post('/', auth, async (req, res) => {
         if (existingLeads[0].status !== 'Booked') {
           updateData.booked_at = new Date().toISOString();
           updateData.ever_booked = true;
+        }
+
+        // Preserve original booker - a reschedule must not hand the booking credit to
+        // whoever moved it. Only set booker_id if not already set.
+        if (!existingLeads[0].booker_id) {
+          updateData.booker_id = req.user.id;
         }
 
         const updateResult = await dbManager.update('leads', updateData, { id: _id });
@@ -1198,50 +1255,95 @@ router.post('/', auth, async (req, res) => {
       finalData: filteredBody
     });
 
-    // Check for existing leads with the same name and phone to prevent duplicates using Supabase
-    if (finalBody.name && finalBody.phone) {
-      // Normalize phone number for better duplicate detection
-      const normalizedPhone = finalBody.phone.replace(/[\s\-\(\)]/g, '');
-      const normalizedName = finalBody.name.trim().toLowerCase();
-      
-      console.log(`📊 Duplicate check: Looking for "${normalizedName}" with phone "${normalizedPhone}"`);
-      
-      // Use Supabase to check for duplicates
-      const existingLeads = await dbManager.query('leads', {
-        select: 'id, name, phone, status, date_booked',
-        is: { deleted_at: null },
-        // Note: Supabase doesn't support complex WHERE clauses like SQLite, so we'll filter in JavaScript
-        // This is a limitation we'll need to work around
+    // Check for an existing record of this customer before creating another one.
+    //
+    // This used to fetch every lead and filter in JavaScript. The fetch had no pagination,
+    // and PostgREST caps an unbounded select at 1000 rows without reporting the
+    // truncation, so most duplicates were never seen. It now asks the database for the
+    // candidates instead of downloading the table, which is both correct and cheaper.
+    if (finalBody.name && (finalBody.phone || finalBody.email)) {
+      // Last 10 digits: the same number is stored as 07…, +447…, 447… and with assorted
+      // spaces and brackets, and the old comparison treated each as a different customer.
+      const phoneDigits = String(finalBody.phone || '').replace(/\D/g, '');
+      const phoneKey = phoneDigits.length >= 10 ? phoneDigits.slice(-10) : null;
+      const emailKey = String(finalBody.email || '').trim().toLowerCase() || null;
+
+      // A phone number identifies a household - couples and families book on one number
+      // constantly - so contact details alone would merge two different people. The
+      // forename settles it. Titles are stripped so "Miss Susan Savage" matches
+      // "Susan Savage", and "Elizabeth" is recognised as "Elizabeth Donnelly".
+      const TITLES = new Set(['mr', 'mrs', 'miss', 'ms', 'dr', 'mx', 'prof']);
+      const forenameOf = (n) => {
+        const t = String(n || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/)
+          .filter(x => x && !TITLES.has(x));
+        return t[0] || null;
+      };
+      const newForename = forenameOf(finalBody.name);
+
+      console.log(`📊 Duplicate check: "${newForename}" phone=${phoneKey || '-'} email=${emailKey || '-'}`);
+
+      // booked_at/booker_id are selected because the rebooking branch below preserves
+      // them when already set; without them on the row those checks always saw undefined
+      // and overwrote both, handing the booking credit to whoever rebooked last.
+      const CANDIDATE_FIELDS = 'id, name, phone, email, status, date_booked, booked_at, booker_id, deleted_at';
+      const candidates = [];
+      if (phoneKey) {
+        candidates.push(...(await dbManager.query('leads', {
+          select: CANDIDATE_FIELDS,
+          ilike: { phone: `%${phoneKey}%` },
+          limit: 200
+        }) || []));
+      }
+      if (emailKey) {
+        candidates.push(...(await dbManager.query('leads', {
+          select: CANDIDATE_FIELDS,
+          ilike: { email: emailKey },
+          limit: 200
+        }) || []));
+      }
+
+      const seen = new Set();
+      const duplicateLeads = candidates.filter(lead => {
+        if (lead.deleted_at || seen.has(lead.id)) return false;
+        const leadDigits = String(lead.phone || '').replace(/\D/g, '');
+        const leadPhoneKey = leadDigits.length >= 10 ? leadDigits.slice(-10) : null;
+        const leadEmailKey = String(lead.email || '').trim().toLowerCase() || null;
+        const contactMatch =
+          (phoneKey && leadPhoneKey === phoneKey) ||
+          (emailKey && leadEmailKey === emailKey);
+        if (!contactMatch) return false;
+        // An unreadable name on either side is not evidence of a different person - fall
+        // back to the contact match rather than letting a blank create a duplicate.
+        const lf = forenameOf(lead.name);
+        if (newForename && lf && lf !== newForename) return false;
+        seen.add(lead.id);
+        return true;
       });
-      
-      // Filter for duplicates in JavaScript (not ideal but necessary for now)
-      const duplicateLeads = existingLeads.filter(lead => {
-        const leadName = lead.name ? lead.name.trim().toLowerCase() : '';
-        const leadPhone = lead.phone ? lead.phone.replace(/[\s\-\(\)]/g, '') : '';
-        return leadName === normalizedName && (
-          lead.phone === finalBody.phone || 
-          leadPhone === normalizedPhone || 
-          leadPhone === finalBody.phone.replace(/[\s\-\(\)]/g, '')
-        );
-      });
-      
+
       if (duplicateLeads.length > 0) {
         console.log(`📊 Duplicate detection: Found ${duplicateLeads.length} existing leads for ${finalBody.name} (${finalBody.phone})`);
         
         // If there's an existing lead and we're trying to book it, update the existing lead instead
         if (finalBody.status === 'Booked' && finalBody.date_booked) {
-          const existingLead = existingLeads[0];
+          const existingLead = duplicateLeads[0];
           console.log(`📊 Updating existing lead ${existingLead.id} instead of creating duplicate`);
           
           // Update the existing lead with booking information
           const updateFields = {
             status: 'Booked',
             date_booked: finalBody.date_booked ? preserveLocalTime(finalBody.date_booked) : null,
-            booker_id: req.user.id,
-            booked_at: new Date().toISOString(), // ✅ BOOKING HISTORY FIX: Set booked_at timestamp
             ever_booked: true, // ✅ BOOKING HISTORY FIX: Mark as ever booked
             updated_at: new Date().toISOString()
           };
+          // Preserve the original booking timestamp and booker. Restamping booked_at moves
+          // the booking out of the week it was actually taken, and overwriting booker_id
+          // hands the credit to whoever rebooked. Only set them on a first booking.
+          if (!existingLead.booked_at) {
+            updateFields.booked_at = new Date().toISOString();
+          }
+          if (!existingLead.booker_id) {
+            updateFields.booker_id = req.user.id;
+          }
           
           // Include reschedule-specific fields if this is a reschedule
           if (isReschedule) {
@@ -1321,8 +1423,11 @@ router.post('/', auth, async (req, res) => {
           });
         } else {
           // If not booking, return error about duplicate
-          return res.status(400).json({ 
-            message: `A lead with the name "${finalBody.name}" and phone "${finalBody.phone}" already exists. Please update the existing lead instead.` 
+          // Matched on phone or email, so name whichever the new lead actually has
+          const contact = [finalBody.phone && `phone "${finalBody.phone}"`, finalBody.email && `email "${finalBody.email}"`].filter(Boolean).join(' / ');
+          return res.status(400).json({
+            message: `A lead called "${duplicateLeads[0].name}" with the same ${contact} already exists. Please update the existing lead instead.`,
+            existingLeadId: duplicateLeads[0].id
           });
         }
       }
@@ -1602,20 +1707,37 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
     // ✅ DAILY ACTIVITY FIX: Don't clear date_booked on cancellation
     // This preserves the original appointment time for historical tracking
     // Cancelled bookings will remain visible in daily activities with their original time
-    if (req.body.status === 'Cancelled') {
-      // Keep date_booked intact - only change status to 'Cancelled'
-      // Calendar won't show it because it filters by status
-      console.log(`📅 Lead cancelled but preserving original date_booked for tracking`);
+    //
+    // Enforced here rather than trusted to callers: older clients still post
+    // date_booked: null on cancel, and the field is on the allow-null list further down,
+    // so an explicit null would otherwise wipe the only record of which day the slot was
+    // on - and drop the cancellation out of every booker report keyed on that date.
+    if (req.body.status === 'Cancelled' && !req.body.date_booked && !req.body.dateBooked && oldDateBooked) {
+      req.body.date_booked = oldDateBooked;
+      delete req.body.dateBooked;
+      console.log(`📅 Cancellation: preserved original date_booked for ${lead.name} (${oldDateBooked})`);
     }
     // Update the lead - filter to only valid database columns
     const { _id, ...updateData } = req.body;
+
+    // Writing a column that doesn't exist yet fails the whole update, so drop the ETA
+    // until migrations/add-lead-eta.sql has been run (see hasEtaColumn).
+    if ((updateData.eta_at !== undefined || updateData.etaAt !== undefined) && !(await hasEtaColumn())) {
+      delete updateData.eta_at;
+      delete updateData.etaAt;
+    }
+
+    // Same for model stats, until migrations/add-model-stats-columns.sql runs.
+    if (MODEL_STATS_COLUMNS.some(c => updateData[c] !== undefined) && !(await hasModelStatsColumns())) {
+      MODEL_STATS_COLUMNS.forEach(c => delete updateData[c]);
+    }
 
     const VALID_LEAD_COLUMNS = new Set([
       'name', 'phone', 'email', 'postcode', 'image_url', 'parent_phone', 'age',
       'booker_id', 'created_by_user_id', 'updated_by_user_id', 'status',
       'date_booked', 'booked_at', 'assigned_at', 'booking_history', 'notes',
       'is_confirmed', 'booking_status', 'ever_booked', 'deleted_at',
-      'updated_at', 'has_sale', 'model_stats',
+      'updated_at', 'has_sale', 'model_stats', 'eta_at', ...MODEL_STATS_COLUMNS,
       // camelCase variants that get converted below
       'bookingHistory', 'dateBooked', 'isConfirmed', 'hasSale', 'bookingStatus', 'modelStats'
     ]);
@@ -1685,7 +1807,9 @@ router.put('/:id([0-9a-fA-F-]{36})', auth, async (req, res) => {
       if (key === 'sendEmail' || key === 'sendSms') continue;
       
       // For certain fields, we want to allow null values to clear them
-      const allowNullFields = ['booking_status', 'date_booked', 'reschedule_reason'];
+      // Model stats need null too: a booker correcting a wrong height to
+      // "unknown" sends null, and skipping it would silently keep the old value.
+      const allowNullFields = ['booking_status', 'date_booked', 'reschedule_reason', 'eta_at', ...MODEL_STATS_COLUMNS];
       if (value === null && allowNullFields.includes(key)) {
         filteredUpdateFields[key] = null;
         continue;
@@ -2630,6 +2754,7 @@ router.get('/:id/events', auth, async (req, res) => {
 router.get('/calendar-public', async (req, res) => {
   try {
     console.log(`📅 Public Calendar API: Fetching events`);
+    const etaSelect = (await hasEtaColumn()) ? ' eta_at,' : '';
 
     const { start, end, limit = 200 } = req.query;
     const validatedLimit = Math.min(parseInt(limit) || 200, 500);
@@ -2640,7 +2765,7 @@ router.get('/calendar-public', async (req, res) => {
       .from('leads')
       .select(`
         id, name, phone, email, status, date_booked, booker_id,
-        is_confirmed, booking_status, has_sale,
+        is_confirmed, booking_status, has_sale,${etaSelect}
         created_at, updated_at, postcode, notes, image_url
       `)
       .or('date_booked.not.is.null,status.eq.Booked')

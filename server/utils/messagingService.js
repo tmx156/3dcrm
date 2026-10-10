@@ -1,6 +1,7 @@
 ﻿// const Database = require('better-sqlite3'); // Removed - using Supabase only
 const path = require('path');
 const { sendEmail: sendActualEmail } = require('./emailService');
+const { createTrackingId } = require('./emailTracking');
 const { sendSMS: sendActualSMS } = require('./smsService');
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid'); // Use uuid package for reliable ID generation
@@ -297,7 +298,9 @@ class MessagingService {
       }
 
       const message = {
-        id: messageResult?.id,
+        // Fall back to the id we generated for the insert - if the insert failed we still
+        // have a valid uuid, instead of undefined leaking into later .eq('id', ...) updates
+        id: messageResult?.id || messageId,
         lead_id: leadId,
         type: (effectiveSendEmail && effectiveSendSms) ? 'both' : (effectiveSendEmail ? 'email' : 'sms'),
         subject: processedTemplate.subject,
@@ -586,7 +589,7 @@ class MessagingService {
       }
 
       const message = {
-        id: messageResult?.id,
+        id: messageResult?.id || reminderMessageId,
         lead_id: leadId,
         type: (effectiveSendEmail && effectiveSendSms) ? 'both' :
               effectiveSendEmail ? 'email' : 'sms',
@@ -686,7 +689,11 @@ class MessagingService {
       }
       
       console.log('📤 Sending email via Gmail API...');
-      
+
+      // Open tracking: a per-message pixel id, persisted after the send so the
+      // tracking endpoint can map a hit back to this row.
+      const trackingId = createTrackingId();
+
       // Actually send the email using the email service
       const startTime = Date.now();
       const emailResult = await sendActualEmail(
@@ -694,7 +701,8 @@ class MessagingService {
         message.subject,
         message.email_body,
         message.attachments || [],
-        emailAccount // Pass the email account key
+        emailAccount, // Pass the email account key
+        { trackingId }
       );
       
       const timeTaken = Date.now() - startTime;
@@ -720,20 +728,37 @@ class MessagingService {
 
       console.log(`📩 [MSG-${messageId}] Updating message status to: ${status}`);
 
-      const { error: updateError } = await supabase
-        .from('messages')
-        .update({
-          email_status: status,
-          status: status,
-          error_message: errorMessage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', message.id);
-
-      if (updateError) {
-        console.error(`❌ Error updating message ${messageId}:`, updateError);
+      if (!message.id) {
+        console.warn(`⚠️ [MSG-${messageId}] No message row id - skipping status update`);
       } else {
-        console.log(`✅ Message ${messageId} updated successfully`);
+        const { error: updateError } = await supabase
+          .from('messages')
+          .update({
+            email_status: status,
+            status: status,
+            error_message: errorMessage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', message.id);
+
+        if (updateError) {
+          console.error(`❌ Error updating message ${messageId}:`, updateError);
+        } else {
+          console.log(`✅ Message ${messageId} updated successfully`);
+        }
+
+        // Only claim a tracking id when the send actually left the building.
+        // Kept apart from the status update so a database without the
+        // read-receipt columns still records the send.
+        if (emailResult.success) {
+          const { error: trackingError } = await supabase
+            .from('messages')
+            .update({ tracking_id: trackingId, open_count: 0 })
+            .eq('id', message.id);
+          if (trackingError) {
+            console.warn(`⚠️ [MSG-${messageId}] Could not store tracking id (run add-photos-and-read-receipts.sql):`, trackingError.message);
+          }
+        }
       }
 
       // Email is already stored in the messages table - no need to duplicate in booking_history
@@ -765,18 +790,22 @@ class MessagingService {
 
         console.error(`📩 [MSG-${messageId}] Updating message status to failed with error:`, errorMessage);
 
-        const { error: updateError } = await supabase
-          .from('messages')
-          .update({
-            email_status: 'failed',
-            status: 'failed',
-            error_message: errorMessage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', message.id);
+        if (!message.id) {
+          console.warn(`⚠️ [MSG-${messageId}] No message row id - skipping failed status update`);
+        } else {
+          const { error: updateError } = await supabase
+            .from('messages')
+            .update({
+              email_status: 'failed',
+              status: 'failed',
+              error_message: errorMessage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', message.id);
 
-        if (updateError) {
-          console.error(`❌ Error updating failed message ${messageId}:`, updateError);
+          if (updateError) {
+            console.error(`❌ Error updating failed message ${messageId}:`, updateError);
+          }
         }
         
         // Add error to booking history
@@ -868,19 +897,23 @@ class MessagingService {
 
       console.log(`📨 [MSG-${messageId}] Updating message status to: ${status}`);
 
-      const { error: updateError } = await supabase
-        .from('messages')
-        .update({
-          status: status,
-          error_message: errorMessage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', message.id);
-
-      if (updateError) {
-        console.error(`❌ Error updating SMS message ${messageId}:`, updateError);
+      if (!message.id) {
+        console.warn(`⚠️ [MSG-${messageId}] No message row id - skipping SMS status update`);
       } else {
-        console.log(`✅ SMS message ${messageId} updated successfully`);
+        const { error: updateError } = await supabase
+          .from('messages')
+          .update({
+            status: status,
+            error_message: errorMessage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', message.id);
+
+        if (updateError) {
+          console.error(`❌ Error updating SMS message ${messageId}:`, updateError);
+        } else {
+          console.log(`✅ SMS message ${messageId} updated successfully`);
+        }
       }
 
       // SMS is already stored in the messages table - no need to duplicate in booking_history
@@ -906,17 +939,21 @@ class MessagingService {
       try {
         const errorMessage = error.message || 'Unknown error';
 
-        const { error: updateError } = await supabase
-          .from('messages')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', message.id);
+        if (!message.id) {
+          console.warn(`⚠️ [MSG-${messageId}] No message row id - skipping failed SMS status update`);
+        } else {
+          const { error: updateError } = await supabase
+            .from('messages')
+            .update({
+              status: 'failed',
+              error_message: errorMessage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', message.id);
 
-        if (updateError) {
-          console.error(`❌ Error updating failed SMS message ${messageId}:`, updateError);
+          if (updateError) {
+            console.error(`❌ Error updating failed SMS message ${messageId}:`, updateError);
+          }
         }
 
         try {

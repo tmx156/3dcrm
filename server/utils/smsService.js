@@ -1,13 +1,29 @@
 ﻿const axios = require('axios');
 const { getSupabaseClient } = require('../config/supabase-client');
+const { publicBaseUrl } = require('./emailTracking');
 const supabase = getSupabaseClient();
+
+// Environment variables can arrive as the literal strings "null"/"undefined" (or quoted/padded)
+// when a missing value is copied through process.env. Treat those as not configured.
+function cleanCredential(value) {
+  if (value === null || value === undefined) return undefined;
+  const trimmed = String(value).trim().replace(/^["']|["']$/g, '').trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return undefined;
+  return trimmed;
+}
+
+// Mask a credential for logs: keep enough to spot a wrong value, never the whole thing
+function maskCredential(value) {
+  if (!value) return 'NOT SET';
+  return value.length <= 8 ? `***(${value.length} chars)` : `${value.slice(0, 4)}...${value.slice(-2)} (${value.length} chars)`;
+}
 
 // SMS Service Configuration - BulkSMS
 const SMS_CONFIG = {
   provider: 'bulksms',
   bulksms: {
-    username: process.env.BULKSMS_USERNAME,
-    password: process.env.BULKSMS_PASSWORD,
+    username: cleanCredential(process.env.BULKSMS_USERNAME),
+    password: cleanCredential(process.env.BULKSMS_PASSWORD),
     // Replyable sender ID - must be verified in BulkSMS dashboard
     fromNumber: process.env.BULKSMS_FROM_NUMBER || '447786200517'
   }
@@ -29,8 +45,8 @@ const RESOLVED_ORIGINATOR = sanitizeNumericOriginator(SMS_CONFIG.bulksms.fromNum
 // Enhanced configuration logging (reduced for Railway)
 console.log('🔍 SMS Configuration Check:');
 console.log('  Provider:', SMS_CONFIG.provider);
-console.log('  Username:', SMS_CONFIG.bulksms.username ? '✅ Set' : '❌ NOT SET');
-console.log('  Password:', SMS_CONFIG.bulksms.password ? '✅ Set' : '❌ NOT SET');
+console.log('  Username:', SMS_CONFIG.bulksms.username ? `✅ Set (${maskCredential(SMS_CONFIG.bulksms.username)})` : '❌ NOT SET');
+console.log('  Password:', SMS_CONFIG.bulksms.password ? `✅ Set (${maskCredential(SMS_CONFIG.bulksms.password)})` : '❌ NOT SET');
 console.log('  From Number:', SMS_CONFIG.bulksms.fromNumber || '❌ NOT SET');
 
 if (SMS_CONFIG.bulksms.username && SMS_CONFIG.bulksms.password) {
@@ -118,8 +134,8 @@ async function createShortLinkForContent(content) {
       return null;
     }
     
-    const base = process.env.PUBLIC_BASE_URL || 'http://localhost:5000';
-    return `${base}/c/${id}`;
+    // Tapped on the recipient's phone, so it must be the public address.
+    return `${publicBaseUrl()}/c/${id}`;
   } catch (err) {
     console.error('Failed to create short link:', err);
     return null;
@@ -257,8 +273,8 @@ const sendSMS = async (to, message) => {
     
     // Detailed environment and configuration logging
     console.log('🔐 Configuration Details:', {
-      username: SMS_CONFIG.bulksms.username ? 'SET' : 'NOT SET',
-      password: SMS_CONFIG.bulksms.password ? 'SET' : 'NOT SET',
+      username: maskCredential(SMS_CONFIG.bulksms.username),
+      password: maskCredential(SMS_CONFIG.bulksms.password),
       fromNumber: SMS_CONFIG.bulksms.fromNumber || 'NOT SET'
     });
 
@@ -461,5 +477,7 @@ module.exports = {
   sendStatusUpdate,
   sendCustomMessage,
   getSMSStatus,
-  testSMSService
+  testSMSService,
+  trackMessageDelivery,
+  cleanCredential
 }; 

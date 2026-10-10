@@ -19,7 +19,9 @@ const config = {
   supabase: {
     url: process.env.SUPABASE_URL,
     anonKey: process.env.SUPABASE_ANON_KEY,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null,
+    // Server-side operations should use serviceRoleKey to bypass RLS
+    serverKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
   },
 
   // SMS Configuration (BulkSMS) - reads from .env only, no fallback credentials

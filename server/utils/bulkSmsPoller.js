@@ -5,6 +5,16 @@ const crypto = require('crypto');
 
 // Load centralized configuration
 const config = require('../config');
+const { cleanCredential } = require('./smsService');
+
+// Credentials can arrive as the literal strings "null"/"undefined" when a missing
+// value is copied through process.env - resolve them the same way smsService does.
+function bulkSmsCredentials() {
+  return {
+    username: cleanCredential(process.env.BULKSMS_USERNAME),
+    password: cleanCredential(process.env.BULKSMS_PASSWORD)
+  };
+}
 
 // Simple BulkSMS reply poller that periodically fetches recent messages
 // and forwards new inbound (MO) items into our unified webhook so that
@@ -78,7 +88,8 @@ function cleanupOldProcessedIds() {
 }
 
 function isConfigured() {
-  return Boolean(process.env.BULKSMS_USERNAME && process.env.BULKSMS_PASSWORD);
+  const { username, password } = bulkSmsCredentials();
+  return Boolean(username && password);
 }
 
 function isInboundMessage(msg) {
@@ -185,10 +196,7 @@ async function pollOnce() {
     // BulkSMS v1 returns both MT and MO items from /v1/messages
     // We fetch a limited page and filter inbound locally
     const resp = await axios.get('https://api.bulksms.com/v1/messages', {
-      auth: {
-        username: process.env.BULKSMS_USERNAME,
-        password: process.env.BULKSMS_PASSWORD,
-      },
+      auth: bulkSmsCredentials(),
       headers: { 'Content-Type': 'application/json' },
       params: {
         limit: 20 // Limit to 20 messages per poll to reduce egress (was unlimited, filter inbound locally)

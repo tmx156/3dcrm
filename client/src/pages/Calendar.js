@@ -5,9 +5,9 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { 
   FiCalendar, FiClock, FiMapPin, FiUser, FiX, FiPhone, FiMail,
-  FiFileText, FiWifi, FiActivity, FiCheckCircle,
+  FiFileText, FiWifi, FiActivity,
   FiExternalLink, FiCheck, FiSettings, FiEdit, FiMessageSquare,
-  FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiSearch
+  FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiSearch, FiNavigation
 } from 'react-icons/fi';
 import axios from 'axios';
 import { useSocket } from '../context/SocketContext';
@@ -16,8 +16,28 @@ import { useNavigate } from 'react-router-dom';
 import SaleModal from '../components/SaleModal';
 import ImageLightbox from '../components/ImageLightbox';
 import LazyImage from '../components/LazyImage';
+import ClientPhotosPanel from '../components/ClientPhotosPanel';
+import ModelStatsCard from '../components/ModelStatsCard';
+import ReadReceiptBadge from '../components/ReadReceiptBadge';
 import GmailEmailRenderer from '../components/GmailEmailRenderer';
 import { getOptimizedImageUrl } from '../utils/imageUtils';
+
+// "On The Way" ETA helpers
+const ETA_PRESETS = [5, 10, 15, 20, 30, 45, 60, 90, 120]; // minutes
+
+const formatEtaTime = (etaAt) => {
+  if (!etaAt) return '';
+  const d = new Date(etaAt);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatEtaDuration = (minutes) => {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return `${m} min`;
+  return m ? `${h} hr ${m} min` : `${h} hr`;
+};
 
 const Calendar = () => {
   const { user } = useAuth();
@@ -26,8 +46,10 @@ const Calendar = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showAllMessages, setShowAllMessages] = useState(false);
-  // Toggle to expand additional quick status actions
-  const [showMoreStatuses, setShowMoreStatuses] = useState(false);
+  // "On The Way" ETA picker
+  const [showEtaPicker, setShowEtaPicker] = useState(false);
+  const [etaHours, setEtaHours] = useState(0);
+  const [etaMinutes, setEtaMinutes] = useState(15);
   
   // PERFORMANCE: Cache for loaded date ranges - use ref to avoid re-render loops
   const loadedRangesRef = useRef(new Set());
@@ -51,6 +73,16 @@ const Calendar = () => {
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [editingNotes, setEditingNotes] = useState(false);
+  // Collapsible notes panel. Remembered per browser so a booker who prefers
+  // it closed is not re-opening it on every appointment. Storage can throw in
+  // private windows, which just means it defaults to closed.
+  const [notesOpen, setNotesOpen] = useState(() => {
+    try { return localStorage.getItem('calendar.notesOpen') === '1'; } catch { return false; }
+  });
+  const setNotesOpenRemembered = (open) => {
+    setNotesOpen(open);
+    try { localStorage.setItem('calendar.notesOpen', open ? '1' : '0'); } catch { /* not persisted */ }
+  };
   const [notesText, setNotesText] = useState('');
   const [sendEmail, setSendEmail] = useState(true);
   const [leadsWithUnreadEmails, setLeadsWithUnreadEmails] = useState(new Set());
@@ -78,6 +110,9 @@ const Calendar = () => {
   // Modal: lead emails (from messages table)
   const [leadMessages, setLeadMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  // Photo gallery deliveries keyed by the email (message) that sent them, so
+  // the email list can show "Viewed gallery" / "Downloaded" receipts
+  const [deliveriesByMessage, setDeliveriesByMessage] = useState({});
   const [showAllEmailsModal, setShowAllEmailsModal] = useState(false);
 
   // Modal: email reply
@@ -85,11 +120,6 @@ const Calendar = () => {
   const [emailReplySubject, setEmailReplySubject] = useState('');
   const [emailReplyBody, setEmailReplyBody] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
-
-  // Modal: model stats
-  const [editingStats, setEditingStats] = useState(false);
-  const [statsForm, setStatsForm] = useState({});
-  const [savingStats, setSavingStats] = useState(false);
 
   // Memoize fetchEvents to prevent unnecessary re-renders
   const [isFetching, setIsFetching] = useState(false);
@@ -114,6 +144,8 @@ const Calendar = () => {
         return '#6b7280'; // gray for unassigned booked leads
       case 'booked':
         return '#1e40af'; // professional blue for booked leads
+      case 'on the way':
+        return '#c026d3'; // fuchsia-600 - client en route, ETA shown on the event
       case 'arrived':
         return '#e06666'; // red to match quick status button
       case 'left':
@@ -313,7 +345,7 @@ const Calendar = () => {
           const hasBookingDate = lead.date_booked && lead.date_booked !== null && lead.date_booked !== 'null';
 
           if (lead.booking_status) {
-            displayStatus = lead.booking_status; // Reschedule, Arrived, Left, No Show, No Sale
+            displayStatus = lead.booking_status; // Reschedule, On The Way, Arrived, Left, No Show, No Sale
           } else if (lead.status === 'Booked') {
             if (!hasBookingDate && lead.updated_at) {
               displayStatus = 'Booked'; // Booked with actual booking date (updated_at)
@@ -326,7 +358,7 @@ const Calendar = () => {
             displayStatus = lead.status;
           }
           
-          const isBookingStatus = ['Reschedule', 'Arrived', 'Left', 'No Show', 'No Sale'].includes(displayStatus);
+          const isBookingStatus = ['Reschedule', 'On The Way', 'Arrived', 'Left', 'No Show', 'No Sale'].includes(displayStatus);
           
           // PERFORMANCE: Simplified title construction
           const event = {
@@ -345,6 +377,7 @@ const Calendar = () => {
               phone: lead.phone,
               status: lead.status,
               displayStatus: displayStatus, // Store what status to display
+              etaAt: displayStatus === 'On The Way' ? (lead.eta_at || null) : null,
               booker: lead.booker?.name || lead.booker_name || 'N/A',
               isConfirmed: lead.is_confirmed || false
             }
@@ -708,6 +741,9 @@ const Calendar = () => {
     const leadId = arg.event.extendedProps?.lead?.id;
     const hasUnreadEmail = leadId && leadsWithUnreadEmails.has(leadId);
     const counts = leadId ? messageCounts[leadId] : null;
+    const etaText = arg.event.extendedProps?.displayStatus === 'On The Way'
+      ? formatEtaTime(arg.event.extendedProps?.etaAt)
+      : '';
     return (
       <div className="fc-event-main px-1 py-0.5 flex items-center">
         <div className="fc-event-title-container flex-1 overflow-hidden">
@@ -716,6 +752,16 @@ const Calendar = () => {
             {arg.event.title}
           </div>
         </div>
+        {etaText && (
+          <span
+            className="inline-flex items-center ml-1 px-1 rounded bg-white font-bold flex-shrink-0"
+            style={{ fontSize: '10px', color: '#c026d3' }}
+            title={`Expected arrival ${etaText}`}
+          >
+            <FiNavigation className="h-2.5 w-2.5 mr-0.5" />
+            ETA {etaText}
+          </span>
+        )}
         {((counts && (counts.sms > 0 || counts.email > 0)) || hasUnreadEmail) && (
           <div className="flex items-center ml-1 flex-shrink-0">
             {(counts && counts.email > 0) || hasUnreadEmail ? (
@@ -789,9 +835,9 @@ const Calendar = () => {
   useEffect(() => {
     if (!showEventModal || !selectedEvent) {
       setLeadMessages([]);
+      setDeliveriesByMessage({});
       setShowReplyEmail(false);
       setShowAllEmailsModal(false);
-      setEditingStats(false);
       return;
     }
     const leadId = selectedEvent.extendedProps?.lead?.id;
@@ -814,25 +860,14 @@ const Calendar = () => {
     };
     fetchMessages();
 
-    // Fetch model stats on-demand
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`/api/leads/${leadId}/model-stats`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const stats = res.data?.model_stats;
-        if (stats && typeof stats === 'object') {
-          setStatsForm(stats);
-        } else if (typeof stats === 'string') {
-          try { setStatsForm(JSON.parse(stats)); } catch { setStatsForm({}); }
-        } else {
-          setStatsForm({});
-        }
-      } catch (e) {
-        setStatsForm({});
-      }
-    };
-    fetchStats();
+    axios.get('/api/photo-delivery', { params: { leadId } })
+      .then(({ data }) => {
+        const map = {};
+        (data?.deliveries || []).forEach(d => { if (d.message_id) map[d.message_id] = d; });
+        setDeliveriesByMessage(map);
+      })
+      .catch(() => setDeliveriesByMessage({}));
+
   }, [showEventModal, selectedEvent?.id]);
 
   // Fetch booking confirmation templates for welcome pack dropdown
@@ -1299,7 +1334,10 @@ const Calendar = () => {
     })}`;
   };
 
-  const handleEventStatusChange = async (newStatus) => {
+  // Statuses stored in booking_status while the lead itself stays 'Booked'
+  const BOOKING_SUB_STATUSES = ['Reschedule', 'On The Way', 'Arrived', 'Left', 'No Show', 'No Sale'];
+
+  const handleEventStatusChange = async (newStatus, { etaAt = null } = {}) => {
     if (!selectedEvent || !selectedEvent.extendedProps?.lead) {
       alert('No lead data available for this event.');
       return;
@@ -1350,6 +1388,9 @@ const Calendar = () => {
       if (!window.confirm(`Set ${leadName}'s appointment to Unconfirmed?`)) {
         return;
       }
+    } else if (newStatus === 'On The Way') {
+      // The ETA picker already asked the user to confirm
+      if (!etaAt) return;
     } else {
       if (!window.confirm(`Are you sure you want to change ${leadName}'s status to "${newStatus}"?`)) {
         return;
@@ -1362,12 +1403,13 @@ const Calendar = () => {
         ...selectedEvent.extendedProps.lead
       };
 
-      // For cancellation, clear the booking date and set to Cancelled
+      // For cancellation, set the status but KEEP the booking date - it is the only
+      // record of which day the slot was on, and clearing it removed the cancellation
+      // from the booker reports entirely (see the guard in PUT /api/leads/:id).
       if (newStatus === 'Cancelled') {
         updateData = {
           ...updateData,
-          status: 'Cancelled', // Set to Cancelled status
-          date_booked: null, // Clear the booking date
+          status: 'Cancelled',
           cancellation_reason: 'Appointment cancelled via calendar'
         };
       } else if (newStatus === 'Confirmed') {
@@ -1386,7 +1428,7 @@ const Calendar = () => {
           is_confirmed: 0,
           booking_status: null // Clear any previous booking status (like 'Arrived')
         };
-      } else if (newStatus === 'Reschedule' || newStatus === 'Arrived' || newStatus === 'Left' || newStatus === 'No Show' || newStatus === 'No Sale') {
+      } else if (BOOKING_SUB_STATUSES.includes(newStatus)) {
         // For these statuses, keep as Booked but store the actual status in a custom field
         updateData = {
           ...updateData,
@@ -1402,6 +1444,9 @@ const Calendar = () => {
           booking_status: null // Clear any previous booking status
         };
       }
+
+      // Only 'On The Way' carries an ETA; any other status clears it
+      updateData.eta_at = newStatus === 'On The Way' ? etaAt : null;
 
       const response = await axios.put(`/api/leads/${selectedEvent.id}`, updateData);
 
@@ -1421,9 +1466,7 @@ const Calendar = () => {
             ? `${leadName} - Booked (Confirmed)`
             : newStatus === 'Unconfirmed'
               ? `${leadName} - Booked (Unconfirmed)`
-              : (newStatus === 'Reschedule' || newStatus === 'Arrived' || newStatus === 'Left' || newStatus === 'No Show' || newStatus === 'No Sale')
-                ? `${leadName} - ${newStatus}`
-                : `${leadName} - ${newStatus}`;
+              : `${leadName} - ${newStatus}`;
           
           const updatedEvent = {
             ...selectedEvent,
@@ -1440,10 +1483,11 @@ const Calendar = () => {
             ),
             extendedProps: {
               ...selectedEvent.extendedProps,
-              status: (newStatus === 'Confirmed' || newStatus === 'Unconfirmed' || newStatus === 'Reschedule' || newStatus === 'Arrived' || newStatus === 'Left' || newStatus === 'No Show' || newStatus === 'No Sale') ? 'Booked' : newStatus,
+              status: (newStatus === 'Confirmed' || newStatus === 'Unconfirmed' || BOOKING_SUB_STATUSES.includes(newStatus)) ? 'Booked' : newStatus,
               displayStatus: newStatus, // Store what status to display
-              isConfirmed: newStatus === 'Confirmed' ? true : (newStatus === 'Unconfirmed' ? false : (newStatus === 'Reschedule' || newStatus === 'Arrived' || newStatus === 'Left' || newStatus === 'No Show' || newStatus === 'No Sale') ? (newStatus === 'Reschedule' ? 0 : null) : selectedEvent.extendedProps?.isConfirmed || false),
-              bookingStatus: (newStatus === 'Reschedule' || newStatus === 'Arrived' || newStatus === 'Left' || newStatus === 'No Show' || newStatus === 'No Sale') ? newStatus : undefined,
+              isConfirmed: newStatus === 'Confirmed' ? true : (newStatus === 'Unconfirmed' ? false : BOOKING_SUB_STATUSES.includes(newStatus) ? (newStatus === 'Reschedule' ? 0 : null) : selectedEvent.extendedProps?.isConfirmed || false),
+              bookingStatus: BOOKING_SUB_STATUSES.includes(newStatus) ? newStatus : undefined,
+              etaAt: newStatus === 'On The Way' ? etaAt : null,
               lead: updatedLead
             }
           };
@@ -1468,6 +1512,7 @@ const Calendar = () => {
             'Confirmed': '✅',
             'Unconfirmed': '🔄',
             'Reschedule': '📅',
+            'On The Way': '🛣️',
             'Arrived': '🚗',
             'Left': '🚪',
             'No Sale': '❌',
@@ -1480,6 +1525,8 @@ const Calendar = () => {
           
           const successMessage = newStatus === 'Confirmed' 
             ? `✅ Successfully confirmed ${leadName}'s appointment`
+            : newStatus === 'On The Way'
+            ? `🛣️ ${leadName} is on the way - ETA ${formatEtaTime(etaAt)}`
             : `${statusEmoji[newStatus] || '✅'} Successfully updated ${leadName}'s status to "${newStatus}"`;
           
           alert(successMessage);
@@ -1495,6 +1542,7 @@ const Calendar = () => {
               newStatus === 'No Show' || oldStatus === 'No Show' ||
               newStatus === 'Unconfirmed' || oldStatus === 'Unconfirmed' ||
               newStatus === 'Reschedule' || oldStatus === 'Reschedule' ||
+              newStatus === 'On The Way' || oldStatus === 'On The Way' ||
               newStatus === 'Arrived' || oldStatus === 'Arrived' ||
               newStatus === 'Left' || oldStatus === 'Left' ||
               newStatus === 'On Show' || oldStatus === 'On Show' ||
@@ -2425,22 +2473,9 @@ const Calendar = () => {
       )}
 
       {/* Event Detail Modal - Wide Layout with Full Details */}
-      {showEventModal && selectedEvent && selectedEvent.start && (() => {
-        // Debug logging for image URL
-        console.log('🖼️ Modal opened - Full selectedEvent:', {
-          id: selectedEvent.id,
-          title: selectedEvent.title,
-          hasExtendedProps: !!selectedEvent.extendedProps,
-          hasLead: !!selectedEvent.extendedProps?.lead,
-          leadKeys: selectedEvent.extendedProps?.lead ? Object.keys(selectedEvent.extendedProps.lead) : [],
-          image_url: selectedEvent.extendedProps?.lead?.image_url,
-          image_url_type: typeof selectedEvent.extendedProps?.lead?.image_url,
-          image_url_length: selectedEvent.extendedProps?.lead?.image_url?.length
-        });
-        return true;
-      })() && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="relative w-full max-w-5xl bg-white rounded-lg shadow-2xl max-h-[95vh] overflow-y-auto calendar-modal-scroll flex flex-col">
+      {showEventModal && selectedEvent && selectedEvent.start && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-1 sm:p-2 md:p-4">
+          <div className="relative w-full max-w-sm sm:max-w-2xl md:max-w-4xl lg:max-w-5xl bg-white rounded-lg shadow-2xl max-h-[95vh] overflow-y-auto calendar-modal-scroll flex flex-col">
             {/* Header: Photo and Main Details Top Right */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-3 sm:p-4">
               {/* Main Details */}
@@ -2540,7 +2575,7 @@ const Calendar = () => {
               })()}
             </div>
             {/* Main Info Center */}
-            <div className="p-4 flex-1">
+            <div className="p-2 sm:p-3 md:p-4 flex-1">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Left Column - Contact Information */}
                 <div>
@@ -2624,6 +2659,7 @@ const Calendar = () => {
                         </div>
                       </div>
                     )}
+
                   </div>
                 </div>
                 {/* Right Column - Details & Actions */}
@@ -2736,179 +2772,191 @@ const Calendar = () => {
                           }
                         }
                         
-                        const isCurrentlyConfirmed = currentDisplayStatus === 'Confirmed';
-                        const isCurrentlyUnconfirmed = currentDisplayStatus === 'Unconfirmed';
-                        const isCurrentlyArrived = currentDisplayStatus === 'Arrived';
-                        const isCurrentlyLeft = currentDisplayStatus === 'Left';
-                        const isCurrentlyNoSale = currentDisplayStatus === 'No Sale';
-                        const isCurrentlyNoShow = currentDisplayStatus === 'No Show';
-                        const isCurrentlyCancelled = currentDisplayStatus === 'Cancelled';
-                        
-                        // Debug log to help identify the issue
-                        console.log('Calendar Status Debug:', {
-                          status: selectedEvent.extendedProps?.status,
-                          isConfirmed: selectedEvent.extendedProps?.isConfirmed,
-                          displayStatus: selectedEvent.extendedProps?.displayStatus,
-                          bookingStatus: selectedEvent.extendedProps?.bookingStatus,
-                          currentDisplayStatus,
-                          isCurrentlyConfirmed,
-                          isCurrentlyUnconfirmed,
-                          isCurrentlyArrived
-                        });
-                        
-                        // Check permissions for button visibility
-                        // const canChangeStatus = user?.role === 'admin' || user?.role === 'viewer' || user?.role === 'booker';
-                        const isAssignedLead = selectedEvent.extendedProps?.lead?.booker === user?.id;
+                        // Check permissions for which options appear in the dropdown
                         const canChangeConfirmation = user?.role === 'admin' || user?.role === 'viewer' || user?.role === 'booker';
                         const canChangeOtherStatuses = user?.role === 'admin' || user?.role === 'viewer';
                         const canCancelBooking = user?.role === 'admin' || user?.role === 'viewer' || user?.role === 'booker';
                         
+                        const isAttended = selectedEvent.extendedProps?.status === 'Attended';
+                        const canCompleteSale = user?.role === 'admin' || user?.role === 'viewer';
+                        const canRejectLead = user?.role === 'admin' || user?.role === 'booker';
+
+                        const statusOptions = [
+                          canChangeConfirmation && 'Confirmed',
+                          canChangeConfirmation && 'Unconfirmed',
+                          canChangeOtherStatuses && 'On The Way',
+                          canChangeOtherStatuses && 'Arrived',
+                          canChangeOtherStatuses && 'Left',
+                          canChangeOtherStatuses && 'No Sale',
+                          canChangeOtherStatuses && 'No Show',
+                          canCancelBooking && 'Cancelled',
+                        ].filter(Boolean);
+                        const selectValue = statusOptions.includes(currentDisplayStatus) ? currentDisplayStatus : '';
+
+                        const handleQuickStatusSelect = (e) => {
+                          const value = e.target.value;
+                          if (!value || value === currentDisplayStatus) return;
+                          if (value === 'On The Way') {
+                            setEtaHours(0);
+                            setEtaMinutes(15);
+                            setShowEtaPicker(true);
+                          } else if (value === '__complete_sale') {
+                            setShowSaleModal(true);
+                          } else if (value === '__reject_lead') {
+                            handleRejectLead();
+                          } else {
+                            handleEventStatusChange(value);
+                          }
+                        };
+
+                        const currentEta = currentDisplayStatus === 'On The Way' ? formatEtaTime(selectedEvent.extendedProps?.etaAt) : '';
+                        const etaTotalMinutes = (Number(etaHours) || 0) * 60 + (Number(etaMinutes) || 0);
+                        const etaPreview = etaTotalMinutes > 0
+                          ? formatEtaTime(new Date(Date.now() + etaTotalMinutes * 60000))
+                          : '';
+
                         return (
-                        <>
-                          <div className="grid grid-cols-2 gap-2">
-                            {/* Confirm/Unconfirm buttons - visible to all authorized users */}
-                            {canChangeConfirmation && (
-                              <>
-                                <button
-                                  onClick={() => handleEventStatusChange('Confirmed')}
-                                  disabled={isCurrentlyConfirmed}
-                                  className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                                    isCurrentlyConfirmed
-                                      ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg transform scale-105'
-                                      : 'bg-gradient-to-r from-emerald-400 to-green-500 text-white hover:from-green-500 hover:to-emerald-600 hover:shadow-lg hover:scale-105'
-                                  }`}
-                                >
-                                  <FiCalendar className="h-4 w-4" />
-                                  <span>{isCurrentlyConfirmed ? '✓ Confirmed' : 'Confirm'}</span>
-                                </button>
-                                <button
-                                  onClick={() => handleEventStatusChange('Unconfirmed')}
-                                  disabled={isCurrentlyUnconfirmed}
-                                  className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                                    isCurrentlyUnconfirmed
-                                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg transform scale-105'
-                                      : 'bg-gradient-to-r from-orange-400 to-amber-400 text-white hover:from-orange-500 hover:to-amber-500 hover:shadow-lg hover:scale-105'
-                                  }`}
-                                >
-                                  <FiClock className="h-4 w-4" />
-                                  <span>{isCurrentlyUnconfirmed ? '✓ Unconfirmed' : 'Unconfirm'}</span>
-                                </button>
-                              </>
-                            )}
-                            
-                            {/* Cancel button - visible to bookers, admins, and viewers */}
-                            {canCancelBooking && (
-                              <button
-                                onClick={() => handleEventStatusChange('Cancelled')}
-                                disabled={isCurrentlyCancelled}
-                                className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 col-span-2 ${
-                                  isCurrentlyCancelled
-                                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg transform scale-105'
-                                    : 'bg-gradient-to-r from-rose-400 to-rose-500 text-white hover:from-rose-500 hover:to-pink-500 hover:shadow-lg hover:scale-105'
-                                }`}
-                              >
-                                <FiX className="h-4 w-4" />
-                                <span>{isCurrentlyCancelled ? '✓ Cancelled' : 'Cancel'}</span>
-                              </button>
-                            )}
-                            
-                            {/* Other status buttons - only visible to users with appropriate permissions */}
-                            {canChangeOtherStatuses && (
-                              <>
-                                <button
-                                  onClick={() => handleEventStatusChange('Arrived')}
-                                  disabled={isCurrentlyArrived}
-                                  className={`flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium text-white transition-all duration-300 ${
-                                    isCurrentlyArrived ? 'shadow-lg transform scale-105' : 'hover:shadow-lg hover:scale-105'
-                                  }`}
-                                  style={{ backgroundColor: '#e06666' }}
-                                >
-                                  <FiCheck className="h-4 w-4" />
-                                  <span>{isCurrentlyArrived ? '✓ Arrived' : 'Arrived'}</span>
-                                </button>
-                                <button
-                                  onClick={() => handleEventStatusChange('Left')}
-                                  disabled={isCurrentlyLeft}
-                                  className={`flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium text-white transition-all duration-300 ${
-                                    isCurrentlyLeft ? 'shadow-lg transform scale-105' : 'hover:shadow-lg hover:scale-105'
-                                  }`}
-                                  style={{ backgroundColor: '#000000' }}
-                                >
-                                  <FiExternalLink className="h-4 w-4" />
-                                  <span>{isCurrentlyLeft ? '✓ Left' : 'Left'}</span>
-                                </button>
-                              </>
-                            )}
+                          <>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-3 w-3 rounded-full flex-shrink-0 border border-gray-200"
+                              style={{ backgroundColor: getEventColor(currentDisplayStatus, false) }}
+                              title={currentDisplayStatus}
+                            />
+                            <select
+                              value={selectValue}
+                              onChange={handleQuickStatusSelect}
+                              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                              {!selectValue && (
+                                <option value="" disabled>{currentDisplayStatus} — change status…</option>
+                              )}
+                              <optgroup label="Status">
+                                {statusOptions.map((s) => (
+                                  <option key={s} value={s}>
+                                    {s === currentDisplayStatus ? `✓ ${s}` : s}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              {(canCompleteSale || canRejectLead) && (
+                                <optgroup label="Actions">
+                                  {canCompleteSale && (
+                                    <option value="__complete_sale" disabled={isAttended}>
+                                      {isAttended ? '✓ Sale Complete' : (selectedSale ? 'Edit Sale…' : 'Complete Sale…')}
+                                    </option>
+                                  )}
+                                  {canRejectLead && (
+                                    <option value="__reject_lead">Reject Lead…</option>
+                                  )}
+                                </optgroup>
+                              )}
+                            </select>
                           </div>
-                          {/* Expandable more statuses */}
-                          {canChangeOtherStatuses && (
-                            <div className="mt-2 flex justify-end">
-                              <button
-                                onClick={() => setShowMoreStatuses(!showMoreStatuses)}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                              >
-                                {showMoreStatuses ? 'Hide' : 'More'}
-                              </button>
+
+                          {currentDisplayStatus === 'On The Way' && (
+                            <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: '#fdf4ff', color: '#a21caf' }}>
+                              <span className="flex items-center font-semibold">
+                                <FiNavigation className="h-4 w-4 mr-2" />
+                                {currentEta ? `On the way - ETA ${currentEta}` : 'On the way - no ETA set'}
+                              </span>
+                              {canChangeOtherStatuses && (
+                                <button
+                                  onClick={() => { setEtaHours(0); setEtaMinutes(15); setShowEtaPicker(true); }}
+                                  className="text-xs font-medium underline hover:no-underline"
+                                >
+                                  Update ETA
+                                </button>
+                              )}
                             </div>
                           )}
-                          {showMoreStatuses && canChangeOtherStatuses && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <button
-                                onClick={() => handleEventStatusChange('No Sale')}
-                                disabled={isCurrentlyNoSale}
-                                className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium text-white transition-all duration-300 ${
-                                  isCurrentlyNoSale 
-                                    ? 'bg-gradient-to-r from-red-700 to-rose-700 shadow-lg transform scale-105' 
-                                    : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 hover:shadow-lg hover:scale-105'
-                                }`}
-                              >
-                                <FiX className="h-4 w-4" />
-                                <span>{isCurrentlyNoSale ? '✓ No Sale' : 'No Sale'}</span>
-                              </button>
-                              <button
-                                onClick={() => handleEventStatusChange('No Show')}
-                                disabled={isCurrentlyNoShow}
-                                className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                                  isCurrentlyNoShow
-                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg transform scale-105'
-                                    : 'bg-gradient-to-r from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-orange-500 hover:shadow-lg hover:scale-105'
-                                }`}
-                              >
-                                <FiX className="h-4 w-4" />
-                                <span>{isCurrentlyNoShow ? '✓ No Show' : 'No Show'}</span>
-                              </button>
-                              {/* Complete Sale button - Only for admin and viewer */}
-                              <button
-                                onClick={() => {
-                                  if (user?.role === 'viewer' || user?.role === 'admin') {
-                                    setShowSaleModal(true);
-                                  }
-                                }}
-                                disabled={selectedEvent.extendedProps?.status === 'Attended' || !(user?.role === 'admin' || user?.role === 'viewer')}
-                                className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                                  selectedEvent.extendedProps?.status === 'Attended'
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg transform scale-105'
-                                    : 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:scale-105'
-                                } ${!(user?.role === 'admin' || user?.role === 'viewer') ? 'hidden' : ''}`}
-                              >
-                                <FiCheckCircle className="h-4 w-4" />
-                                <span>{selectedEvent.extendedProps?.status === 'Attended' ? '✓ Complete' : (selectedSale ? 'Edit Sale' : 'Complete')}</span>
-                              </button>
-                              
-                              {/* Reject Lead button - Only for booker and admin */}
-                              <button
-                                onClick={() => handleRejectLead()}
-                                disabled={!(user?.role === 'admin' || user?.role === 'booker')}
-                                className={`relative overflow-hidden group flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                                  'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 hover:shadow-lg hover:scale-105 text-white'
-                                } ${!(user?.role === 'admin' || user?.role === 'booker') ? 'hidden' : ''}`}
-                              >
-                                <FiX className="h-4 w-4" />
-                                <span>Reject Lead</span>
-                              </button>
+
+                          {showEtaPicker && (
+                            <div className="fixed inset-0 bg-black bg-opacity-40 z-[60] flex items-center justify-center p-4" onClick={() => setShowEtaPicker(false)}>
+                              <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                  <h4 className="text-base font-bold text-gray-900 flex items-center">
+                                    <FiNavigation className="h-5 w-5 mr-2" style={{ color: '#c026d3' }} />
+                                    How long until they arrive?
+                                  </h4>
+                                  <button onClick={() => setShowEtaPicker(false)} className="text-gray-400 hover:text-gray-600">
+                                    <FiX className="h-5 w-5" />
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                  {ETA_PRESETS.map((mins) => {
+                                    const active = etaTotalMinutes === mins;
+                                    return (
+                                      <button
+                                        key={mins}
+                                        onClick={() => { setEtaHours(Math.floor(mins / 60)); setEtaMinutes(mins % 60); }}
+                                        className={`px-2 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                                          active ? 'text-white border-transparent' : 'bg-white text-gray-700 border-gray-300 hover:border-fuchsia-400'
+                                        }`}
+                                        style={active ? { backgroundColor: '#c026d3' } : undefined}
+                                      >
+                                        {formatEtaDuration(mins)}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="flex items-end gap-3 mb-4">
+                                  <label className="flex-1 text-xs font-medium text-gray-600">
+                                    Hours
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="12"
+                                      value={etaHours}
+                                      onChange={(e) => setEtaHours(Math.max(0, Math.min(12, parseInt(e.target.value, 10) || 0)))}
+                                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                                    />
+                                  </label>
+                                  <label className="flex-1 text-xs font-medium text-gray-600">
+                                    Minutes
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="59"
+                                      step="5"
+                                      value={etaMinutes}
+                                      onChange={(e) => setEtaMinutes(Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)))}
+                                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                                    />
+                                  </label>
+                                </div>
+
+                                <p className="text-sm text-gray-600 mb-4 text-center">
+                                  {etaPreview
+                                    ? <>Expected arrival <span className="font-bold text-gray-900">{etaPreview}</span></>
+                                    : 'Pick how long they will be'}
+                                </p>
+
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setShowEtaPicker(false)}
+                                    className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    disabled={!etaPreview}
+                                    onClick={() => {
+                                      const etaAt = new Date(Date.now() + etaTotalMinutes * 60000).toISOString();
+                                      setShowEtaPicker(false);
+                                      handleEventStatusChange('On The Way', { etaAt });
+                                    }}
+                                    className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                                    style={{ backgroundColor: '#c026d3' }}
+                                  >
+                                    Set On The Way
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           )}
-                        </>
+                          </>
                         );
                       })()}
                     </div>
@@ -2924,7 +2972,10 @@ const Calendar = () => {
                       <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
                         <FiMail className="h-4 w-4 text-white" />
                       </div>
-                      <div className="flex-1">
+                      {/* min-w-0: a flex item will not shrink below its content by
+                          default, so the one-line email preview (truncate) was
+                          stretching the whole window 217px past a phone screen. */}
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setShowAllMessages(!showAllMessages)}>
                             <p className="text-xs font-bold text-gray-800 uppercase tracking-wide">Emails</p>
@@ -2962,6 +3013,7 @@ const Calendar = () => {
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${isSent ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
                                           {isSent ? 'Sent' : 'Received'}
                                         </span>
+                                        {isSent && <ReadReceiptBadge message={msg} delivery={deliveriesByMessage[msg.id]} />}
                                       </div>
                                       <p className="text-[10px] text-gray-400 mb-1">{formattedTime}</p>
                                       {msg.subject && (
@@ -3079,7 +3131,21 @@ const Calendar = () => {
                     </div>
                   </div>
 
-                  {/* Model Stats - disabled for now, re-enable when DB column is ready */}
+                  {/* Model Stats - hidden fields until migrations/add-model-stats-columns.sql runs */}
+                  <ModelStatsCard
+                    lead={selectedEvent.extendedProps?.lead}
+                    user={user}
+                    onSaved={(saved) => {
+                      const leadId = selectedEvent.extendedProps?.lead?.id || selectedEvent.id;
+                      setSelectedEvent(prev => prev ? ({
+                        ...prev,
+                        extendedProps: { ...prev.extendedProps, lead: { ...prev.extendedProps?.lead, ...saved } }
+                      }) : prev);
+                      setEvents(prevEvents => prevEvents.map(ev => ev.id === leadId
+                        ? { ...ev, extendedProps: { ...ev.extendedProps, lead: { ...ev.extendedProps?.lead, ...saved } } }
+                        : ev));
+                    }}
+                  />
 
                   {/* Notes */}
                   <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg p-3">
@@ -3087,21 +3153,44 @@ const Calendar = () => {
                       <div className="w-8 h-8 rounded-lg bg-gray-500 flex items-center justify-center flex-shrink-0">
                         <FiFileText className="h-4 w-4 text-white" />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Notes</p>
+                      <div className="flex-1 min-w-0">
+                        <div className={`flex items-center justify-between ${notesOpen || editingNotes ? 'mb-1' : ''}`}>
+                          {/* The header toggles the panel. While closed it shows the
+                              first line of the note, so an important note is not
+                              hidden just because the panel is folded away. */}
+                          <button
+                            type="button"
+                            onClick={() => !editingNotes && setNotesOpenRemembered(!notesOpen)}
+                            aria-expanded={notesOpen || editingNotes}
+                            className="flex items-center gap-1.5 min-w-0 flex-1 text-left group"
+                            title={notesOpen ? 'Hide notes' : 'Show notes'}
+                          >
+                            {notesOpen || editingNotes
+                              ? <FiChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                              : <FiChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />}
+                            <span className="text-xs font-medium text-gray-600 uppercase tracking-wide flex-shrink-0 group-hover:text-gray-900">
+                              Notes
+                            </span>
+                            {!notesOpen && !editingNotes && (
+                              <span className="text-xs text-gray-500 truncate ml-1">
+                                {selectedEvent.extendedProps?.lead?.notes
+                                  ? `— ${selectedEvent.extendedProps.lead.notes.split('\n').find(l => l.trim()) || ''}`
+                                  : '— none'}
+                              </span>
+                            )}
+                          </button>
                           {!editingNotes && (
                             <button
-                              onClick={handleEditNotes}
-                              className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                              onClick={() => { setNotesOpenRemembered(true); handleEditNotes(); }}
+                              className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex-shrink-0"
                             >
                               <FiEdit className="h-3 w-3" />
                               <span>Edit Notes</span>
                             </button>
                           )}
                         </div>
-                        
-                        {editingNotes ? (
+
+                        {!(notesOpen || editingNotes) ? null : editingNotes ? (
                           <div className="space-y-3">
                             <div className="relative">
                               <textarea
@@ -3182,6 +3271,14 @@ const Calendar = () => {
                       </div>
                     </div>
                   )}
+                  {/* Client Photos */}
+                  <ClientPhotosPanel
+                    leadId={selectedEvent.extendedProps?.lead?.id || selectedEvent.id}
+                    leadName={selectedEvent.extendedProps?.lead?.name}
+                    leadEmail={selectedEvent.extendedProps?.lead?.email}
+                    user={user}
+                  />
+
                   {/* Booking History */}
                   {selectedEvent.extendedProps?.lead?.bookingHistory && Array.isArray(selectedEvent.extendedProps.lead.bookingHistory) && (
                     <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-4 mt-4 max-h-48 overflow-y-auto">

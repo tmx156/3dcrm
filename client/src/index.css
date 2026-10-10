@@ -520,3 +520,43 @@
     @apply p-1;
   }
 }
+
+/* Presentation gallery (components/PresentationGallery.js). The stage stacks
+   the outgoing and incoming photo and fades the new one in once it has
+   loaded, so a slow image never flashes up half-drawn. */
+.slideshow-image {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+  z-index: 0;
+}
+
+.slideshow-image.active {
+  opacity: 1;
+  z-index: 1;
+}
+
+.slideshow-image.previous {
+  opacity: 0;
+  z-index: 0;
+}
+
+/* Phone: the slides are absolutely positioned, so the stage padding does
+   not reach them. Keep the photo clear of the header and folder row above
+   and the select/send buttons and thumbnails below. */
+@media (max-width: 639px) {
+  .slideshow-framed .slideshow-image {
+    inset: 96px 8px 208px 8px;
+  }
+}
+
+.slideshow-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}

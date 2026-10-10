@@ -11,6 +11,7 @@ console.log('[Gmail API] Email Service: Initializing...');
 const { google } = require('googleapis');
 const MailComposer = require('nodemailer/lib/mail-composer');
 const { getAuthedClient } = require('./gmailClient');
+const { injectTrackingPixel } = require('./emailTracking');
 
 // The sending address — must match the account authorised via OAuth
 const GMAIL_FROM = process.env.GMAIL_USER || process.env.EMAIL_USER;
@@ -33,9 +34,10 @@ if (EMAIL_SENDING_DISABLED) {
  * @param {string} body          - Email body (HTML or plain text)
  * @param {Array}  attachments   - Nodemailer-style attachment objects (optional)
  * @param {string} _accountKey   - Kept for backwards compat, ignored (single account)
+ * @param {object} options       - { trackingId } to embed an open-tracking pixel
  * @returns {Promise<{success: boolean, response?: string, error?: string}>}
  */
-async function sendEmail(to, subject, body, attachments = [], _accountKey = 'primary') {
+async function sendEmail(to, subject, body, attachments = [], _accountKey = 'primary', options = {}) {
   const emailId = Math.random().toString(36).substring(2, 8);
 
   console.log(`[${emailId}] Sending email: ${subject} -> ${to}`);
@@ -73,7 +75,17 @@ async function sendEmail(to, subject, body, attachments = [], _accountKey = 'pri
 
     if (inputAttachments.length > 0) {
       for (const att of inputAttachments) {
-        if (!att.path || !att.filename) continue;
+        if (!att.filename) continue;
+
+        // In-memory attachments (e.g. a photo ZIP built on the fly) arrive as
+        // a Buffer rather than a path, so size-check the buffer directly.
+        if (att.content) {
+          const size = Buffer.isBuffer(att.content) ? att.content.length : 0;
+          if (size > 0 && size <= 25 * 1024 * 1024) validAttachments.push(att);
+          continue;
+        }
+
+        if (!att.path) continue;
         try {
           const stats = await fs.stat(att.path);
           if (stats.size > 0 && stats.size <= 25 * 1024 * 1024) {
@@ -86,15 +98,22 @@ async function sendEmail(to, subject, body, attachments = [], _accountKey = 'pri
       console.log(`[${emailId}] Attachments: ${validAttachments.length}/${inputAttachments.length} valid`);
     }
 
+    // --- Open tracking ---
+    // Callers opt in by passing a trackingId and storing it on the message
+    // row; the pixel is only injected into HTML bodies.
+    const trackedBody = options.trackingId
+      ? injectTrackingPixel(body, options.trackingId)
+      : body;
+
     // --- Detect whether body is HTML ---
-    const isHtml = /<[a-z][\s\S]*>/i.test(body);
+    const isHtml = /<[a-z][\s\S]*>/i.test(trackedBody);
 
     // --- Build MIME message with MailComposer ---
     const mailOptions = {
       from: { name: FROM_NAME, address: GMAIL_FROM },
       to,
       subject,
-      ...(isHtml ? { html: body } : { text: body }),
+      ...(isHtml ? { html: trackedBody } : { text: trackedBody }),
       attachments: validAttachments,
       headers: {
         'X-Email-ID': emailId,
@@ -139,6 +158,8 @@ async function sendEmail(to, subject, body, attachments = [], _accountKey = 'pri
 
 module.exports = {
   sendEmail,
+  FROM_NAME,
+  GMAIL_FROM,
   // Legacy exports kept so nothing breaks at require-time
   transporter: null,
   createTransporter: () => null,
