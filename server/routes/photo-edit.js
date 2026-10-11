@@ -147,7 +147,7 @@ router.post('/retouch-missing', auth, async (req, res) => {
     if (!retouchQueue.isEnabled()) {
       return res.status(503).json({
         success: false,
-        message: 'AI retouching is not configured - add OPENAI_API_KEY to the server environment'
+        message: 'AI retouching is turned off on this CRM'
       });
     }
 
@@ -201,7 +201,7 @@ router.post('/:photoId', auth, async (req, res) => {
   if (!imageEdit.isConfigured()) {
     return res.status(503).json({
       success: false,
-      message: 'AI photo editing is not configured - add OPENAI_API_KEY to the server environment'
+      message: 'AI photo editing is turned off on this CRM'
     });
   }
 

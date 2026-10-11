@@ -461,7 +461,11 @@ const GUARDRAIL =
   'whatever they are sitting on, standing on, leaning on, lying on, holding, ' +
   'wearing or touching stays exactly as it is.';
 
-const isConfigured = () => !!process.env.OPENAI_API_KEY;
+// AI editing is switched OFF unless PHOTO_AI_EDITING=true. Every AI feature -
+// the retouch button, auto-retouch on upload, the retouch endpoints - checks
+// this, so with it off the CRM is a plain photo upload and gallery.
+const AI_EDITING_ON = (process.env.PHOTO_AI_EDITING || '').toLowerCase() === 'true';
+const isConfigured = () => AI_EDITING_ON && !!process.env.OPENAI_API_KEY;
 
 /**
  * Shared rate-limit cooldown. OpenAI's image limit is per account, so when
@@ -707,7 +711,7 @@ async function editImage({
   outputHeight
 }) {
   if (!isConfigured()) {
-    throw new Error('AI photo editing is not configured (OPENAI_API_KEY is missing)');
+    throw new Error('AI photo editing is turned off (set PHOTO_AI_EDITING=true and OPENAI_API_KEY to enable)');
   }
   if (!API_INPUT_MIME.has(mimeType)) {
     throw new Error(`${mimeType} cannot be sent to the image API`);
