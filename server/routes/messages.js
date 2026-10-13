@@ -16,7 +16,7 @@ router.get('/lead/:leadId', auth, async (req, res) => {
     // Check if user has access to this lead using Supabase
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('id')
+      .select('id, booker_id')
       .eq('id', leadId)
       .single();
 
@@ -24,17 +24,18 @@ router.get('/lead/:leadId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Lead not found' });
     }
 
-    // Build query for messages - only admins can view all message history
+    // Admins and the lead's booker see the full conversation (including replies
+    // from the lead); anyone else only sees messages they sent themselves
     let messagesQuery = supabase
       .from('messages')
+      // No users() join: messages has no FK to users, and requesting it fails the whole query
       .select(`
         *,
-        templates(name, type),
-        users(name)
+        templates(name, type)
       `)
       .eq('lead_id', leadId);
 
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && lead.booker_id !== req.user.id) {
       messagesQuery = messagesQuery.eq('sent_by', req.user.id);
     }
 

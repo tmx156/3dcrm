@@ -640,10 +640,7 @@ router.post('/:id/preview', auth, async (req, res) => {
 // Get template variables
 router.get('/variables/list', auth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin only.' });
-    }
-
+    // Open to all users - bookers need the list to build their own templates
     const { type } = req.query;
     let variables = [
       { name: '{leadName}', description: 'Lead\'s full name', example: 'John Doe' },

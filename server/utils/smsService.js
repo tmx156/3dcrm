@@ -175,6 +175,9 @@ const processTemplate = (template, lead, bookingDate = null) => {
     '{currentTime}': new Date().toLocaleTimeString('en-GB', { timeZone: 'UTC' })
   };
   
+  // Older templates saved variables as {{leadName}} / {{{leadName}}}; collapse to {leadName}
+  processedTemplate = String(processedTemplate || '').replace(/\{+\s*([a-zA-Z]+)\s*\}+/g, '{$1}');
+
   // Replace variables in template
   Object.keys(variables).forEach(key => {
     const value = variables[key];

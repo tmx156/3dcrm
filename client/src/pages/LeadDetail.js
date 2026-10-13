@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FiArrowLeft, FiEdit, FiSave, FiPhone, FiMail, FiMapPin, FiCalendar, FiMessageSquare, FiSend, FiChevronLeft, FiChevronRight, FiChevronUp, FiChevronDown, FiActivity, FiCheckCircle, FiX, FiRefreshCw, FiClock, FiUser, FiCheck, FiSettings, FiAlertCircle } from 'react-icons/fi';
 import axios from 'axios';
@@ -6,11 +6,16 @@ import TagSystem from '../components/TagSystem';
 import PhotoModal from '../components/PhotoModal';
 import LazyImage from '../components/LazyImage';
 import { getOptimizedImageUrl, preloadImages } from '../utils/imageUtils';
+import { useAuth } from '../context/AuthContext';
+import { fetchLeadConversation } from '../utils/leadConversation';
 
 const LeadDetail = () => {
   const { id } = useParams();
+  const currentIdRef = useRef(id);
+  currentIdRef.current = id;
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,8 +64,11 @@ const LeadDetail = () => {
   const [messagesExpanded, setMessagesExpanded] = useState(false);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [conversationLoading, setConversationLoading] = useState(false);
+  const conversationScrollRef = useRef(null);
   const [newReply, setNewReply] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
   const [replyMode, setReplyMode] = useState('sms'); // 'sms' or 'email'
+  const [sendingReply, setSendingReply] = useState(false);
   
   // Auto-resize textarea function
   const autoResizeTextarea = (textarea) => {
@@ -85,47 +93,13 @@ const LeadDetail = () => {
   const [noAnswerLoading, setNoAnswerLoading] = useState(false);
   const [noAnswerTemplate, setNoAnswerTemplate] = useState(null);
 
-  // Fallback templates for when API is unavailable
-  const fallbackSmsTemplates = [
-    { _id: 'welcome', name: 'Welcome Message', message: "Hi [NAME], thanks for your interest! We'll contact you shortly to confirm your photoshoot booking." },
-    { _id: 'reminder', name: 'Reminder Message', message: "Hi [NAME], just a reminder about your modelling photoshoot on [DATE] at [TIME]." },
-    { _id: 'followup', name: 'Follow-up Message', message: "Hi [NAME], we noticed you haven't confirmed your session. Let us know if you're still interested!" }
-  ];
-
-  const fallbackEmailTemplates = [
-    { 
-      _id: 'welcome', 
-      name: 'Welcome Email',
-      subject: "Welcome to our Modelling Studio - [NAME]",
-      message: "Dear [NAME],\n\nThank you for your interest in our modelling services! We're excited to work with you.\n\nWe'll be in touch shortly to confirm your photoshoot booking and discuss the details.\n\nIf you have any questions in the meantime, please don't hesitate to reach out.\n\nBest regards,\nThe Studio Team"
-    },
-    { 
-      _id: 'reminder', 
-      name: 'Reminder Email',
-      subject: "Reminder: Your Photoshoot on [DATE]",
-      message: "Dear [NAME],\n\nThis is a friendly reminder about your upcoming modelling photoshoot scheduled for [DATE] at [TIME].\n\nPlease ensure you arrive 15 minutes early and bring any items we discussed.\n\nLooking forward to working with you!\n\nBest regards,\nThe Studio Team"
-    },
-    { 
-      _id: 'followup', 
-      name: 'Follow-up Email',
-      subject: "Following up on your Modelling Session - [NAME]", 
-      message: "Dear [NAME],\n\nWe noticed that you haven't confirmed your modelling session yet.\n\nWe're still very interested in working with you and would love to schedule your photoshoot.\n\nPlease let us know if you're still interested or if you have any questions.\n\nBest regards,\nThe Studio Team"
-    },
-    { 
-      _id: 'booking_confirmation', 
-      name: 'Booking Confirmation',
-      subject: "Booking Confirmed - Your Photoshoot on [DATE]",
-      message: "Dear [NAME],\n\nGreat news! Your photoshoot has been confirmed for [DATE] at [TIME].\n\nLocation: Our Studio\nDuration: Approximately 2 hours\n\nPlease bring:\n- A variety of outfits\n- Any specific props or accessories\n- A positive attitude!\n\nWe can't wait to work with you!\n\nBest regards,\nThe Studio Team"
-    }
-  ];
-
   // Utility to group templates by category (Bookers Templates)
   const categorizeTemplates = (templates) => {
     const categories = {
-      'Booking & Reminders': ['booking_confirmation', 'appointment_reminder'],
-      'Custom Templates': ['custom'],
+      'Status Templates': ['wrong_number', 'no_answer'],
+      'My Templates': ['custom'],
     };
-    const grouped = { 'Booking & Reminders': [], 'Custom Templates': [] };
+    const grouped = { 'My Templates': [], 'Status Templates': [] };
     templates.forEach(t => {
       let found = false;
       for (const [cat, types] of Object.entries(categories)) {
@@ -135,15 +109,14 @@ const LeadDetail = () => {
           break;
         }
       }
-      if (!found) grouped['Custom Templates'].push(t); // Default to Custom Templates if unknown
+      if (!found) grouped['My Templates'].push(t);
     });
     return grouped;
   };
 
-  // Show only Bookers Templates (matching BookersTemplates page)
+  // Show only templates the booker created themselves - booking confirmations and
+  // reminders are sent automatically, so they don't belong in the manual dropdown
   const isLeadTemplate = (t) => [
-    'booking_confirmation',
-    'appointment_reminder',
     'wrong_number',
     'no_answer',
     'custom'
@@ -253,6 +226,21 @@ const LeadDetail = () => {
     }
   }, [allLeads, currentIndex]);
 
+  // Keep the newest message in view
+  useEffect(() => {
+    const el = conversationScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conversationHistory, messagesExpanded]);
+
+  // New lead: drop the previous lead's conversation and any half-written reply
+  useEffect(() => {
+    setConversationHistory([]);
+    setNewReply('');
+    setEmailSubject('');
+    setSelectedTemplate('');
+    setSelectedEmailTemplate('');
+  }, [id]);
+
   // Fetch conversation history when messages section is expanded
   useEffect(() => {
     if (messagesExpanded && lead) {
@@ -288,9 +276,8 @@ const LeadDetail = () => {
       setEmailTemplates(bookersTemplates.filter(t => t.emailBody || t.sendEmail));
     } catch (error) {
       console.error('Error fetching templates:', error);
-      // Use fallback templates
-      setSmsTemplates(fallbackSmsTemplates);
-      setEmailTemplates(fallbackEmailTemplates);
+      setSmsTemplates([]);
+      setEmailTemplates([]);
     }
   };
 
@@ -503,24 +490,41 @@ const LeadDetail = () => {
   };
 
   // Template placeholder replacement
+  // Handles {leadName}, {{leadName}} and {{{leadName}}} (the Bookers Templates editor
+  // has saved all three forms) plus the legacy [NAME]/[DATE]/[TIME] tokens.
   const replacePlaceholders = (message) => {
-    const defaultDate = new Date(lead.dateBooked).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'UTC'
-    });
-    const defaultTime = new Date(lead.dateBooked).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'UTC'
-    });
+    if (!message) return '';
+    const booked = lead.dateBooked ? new Date(lead.dateBooked) : null;
+    const hasBooking = booked && !isNaN(booked.getTime());
+    const bookingDate = hasBooking ? booked.toLocaleDateString('en-GB', { timeZone: 'UTC' }) : '';
+    const bookingTime = hasBooking
+      ? booked.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+      : '';
+    const now = new Date();
+
+    const values = {
+      leadname: lead.name || '',
+      leademail: lead.email || '',
+      leadphone: lead.phone || '',
+      username: user?.name || '',
+      useremail: user?.email || '',
+      bookername: user?.name || '',
+      bookeremail: user?.email || '',
+      bookingdate: bookingDate,
+      bookingtime: bookingTime,
+      companyname: '3D Models',
+      currentdate: now.toLocaleDateString('en-GB'),
+      currenttime: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    };
 
     return message
-      .replace(/\[NAME\]/g, lead.name)
-      .replace(/\[DATE\]/g, defaultDate)
-      .replace(/\[TIME\]/g, defaultTime);
+      .replace(/\{+\s*([a-zA-Z]+)\s*\}+/g, (match, key) => {
+        const value = values[key.toLowerCase()];
+        return value !== undefined ? value : match;
+      })
+      .replace(/\[NAME\]/g, values.leadname)
+      .replace(/\[DATE\]/g, bookingDate)
+      .replace(/\[TIME\]/g, bookingTime);
   };
 
   const addHistoryEntry = async (action, details) => {
@@ -540,25 +544,13 @@ const LeadDetail = () => {
   // Conversation Functions
   const fetchConversationHistory = async () => {
     if (!lead || !messagesExpanded) return;
-    
+
+    const leadId = lead.id;
     try {
-      setConversationLoading(true);
-      
-      // Get conversation history from booking history
-      if (lead.booking_history) {
-        const history = typeof lead.booking_history === 'string' 
-          ? JSON.parse(lead.booking_history) 
-          : lead.booking_history;
-        
-        // Filter communication entries and sort by timestamp
-        const communications = history
-          .filter(entry => ['SMS_SENT', 'SMS_RECEIVED', 'EMAIL_SENT', 'EMAIL_RECEIVED'].includes(entry.action))
-          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        
-        setConversationHistory(communications);
-      } else {
-        setConversationHistory([]);
-      }
+      if (conversationHistory.length === 0) setConversationLoading(true);
+      const messages = await fetchLeadConversation(leadId, lead.booking_history);
+      // Ignore the result if the user has moved on to another lead meanwhile
+      if (leadId === currentIdRef.current) setConversationHistory(messages);
     } catch (error) {
       console.error('Error fetching conversation history:', error);
       setConversationHistory([]);
@@ -567,71 +559,75 @@ const LeadDetail = () => {
     }
   };
 
+  // Re-read the lead's booking history so the conversation shows what was just sent
+  // (fetchConversationHistory reads lead.booking_history, which is otherwise stale)
+  const refreshConversation = async () => {
+    try {
+      const response = await axios.get(`/api/leads/${lead.id}`);
+      setLead(prev => (prev && prev.id === response.data.id
+        ? { ...prev, booking_history: response.data.booking_history }
+        : prev));
+    } catch (error) {
+      console.error('Error refreshing conversation:', error);
+    }
+  };
+
+  const resetReplyForm = () => {
+    setNewReply('');
+    setEmailSubject('');
+    setSelectedTemplate('');
+    setSelectedEmailTemplate('');
+  };
+
   const handleSendQuickReply = async () => {
+    if (sendingReply) return;
     if (!newReply.trim()) {
       alert('Please enter a reply message.');
       return;
     }
-    
+
+    // Safety net: fill in any variables still in the text (e.g. typed by hand)
+    const messageText = replacePlaceholders(newReply);
+
     try {
+      setSendingReply(true);
       if (replyMode === 'sms') {
         if (!lead.phone) {
           alert('This lead does not have a phone number.');
           return;
         }
-        
+
+        // The server records SMS_SENT in the booking history itself
         const response = await axios.post(`/api/leads/${lead.id}/send-sms`, {
-          message: newReply,
+          message: messageText,
           type: 'custom'
         });
-        
+
         if (response.data.success) {
           alert(`SMS sent successfully to ${lead.phone}!`);
-          
-          // Add to booking history
-          await addHistoryEntry('SMS_SENT', {
-            recipient: lead.phone,
-            message: newReply,
-            template: 'Quick reply'
-          });
-          
-          setNewReply('');
-          // Refresh conversation
-          setTimeout(() => fetchConversationHistory(), 1000);
+          resetReplyForm();
+          refreshConversation();
         } else {
           alert(`Failed to send SMS: ${response.data.message}`);
         }
       } else {
-        // Email reply
         if (!lead.email) {
           alert('This lead does not have an email address.');
           return;
         }
-        
-        // Parse subject and body from newReply if email template was used
-        let emailSubject = 'Reply';
-        let emailBody = newReply;
-        
-        // If template contained subject (first line before double newline)
-        if (newReply.includes('\n\n')) {
-          const parts = newReply.split('\n\n');
-          if (parts[0].length < 100) { // First part is likely subject if short
-            emailSubject = parts[0];
-            emailBody = parts.slice(1).join('\n\n');
-          }
-        }
-        
+
+        const subject = replacePlaceholders(emailSubject).trim() || 'Reply';
+
         const response = await axios.post(`/api/leads/${lead.id}/send-email`, {
-          subject: emailSubject,
-          body: emailBody
+          subject,
+          body: messageText,
+          templateId: selectedEmailTemplate || undefined
         });
-        
+
         if (response.data.success) {
           alert(`Email sent successfully to ${lead.email}!`);
-          
-          setNewReply('');
-          // Refresh conversation
-          setTimeout(() => fetchConversationHistory(), 1000);
+          resetReplyForm();
+          refreshConversation();
         } else {
           alert(`Failed to send email: ${response.data.message}`);
         }
@@ -639,6 +635,8 @@ const LeadDetail = () => {
     } catch (error) {
       console.error('Error sending reply:', error);
       alert(`Error sending reply: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -1316,7 +1314,7 @@ const LeadDetail = () => {
                   {messagesExpanded && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       {/* Conversation History */}
-                      <div className="max-h-80 overflow-y-auto bg-gray-50 rounded-lg p-4 mb-4">
+                      <div ref={conversationScrollRef} className="max-h-80 overflow-y-auto bg-gray-50 rounded-lg p-4 mb-4">
                         {conversationLoading ? (
                           <div className="flex items-center justify-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
@@ -1330,15 +1328,20 @@ const LeadDetail = () => {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {conversationHistory.map((message, index) => (
-                              <div 
+                            {conversationHistory.map((message, index) => {
+                              const isFailed = message.action.endsWith('_FAILED');
+                              const isOutgoing = message.action.endsWith('_SENT') || isFailed;
+                              return (
+                              <div
                                 key={`${message.timestamp}-${index}`}
-                                className={`flex ${(['SMS_SENT', 'EMAIL_SENT'].includes(message.action)) ? 'justify-end' : 'justify-start'}`}
+                                className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
                               >
                                 <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm ${
-                                  (['SMS_SENT', 'EMAIL_SENT'].includes(message.action))
-                                    ? 'bg-blue-500 text-white' 
-                                    : 'bg-white border text-gray-900'
+                                  isFailed
+                                    ? 'bg-red-50 border border-red-300 text-red-900'
+                                    : isOutgoing
+                                      ? 'bg-blue-500 text-white'
+                                      : 'bg-white border text-gray-900'
                                 }`}>
                                   {/* Message content */}
                                   {message.action.includes('EMAIL') && message.details?.subject && (
@@ -1349,41 +1352,37 @@ const LeadDetail = () => {
                                   <p className="text-sm whitespace-pre-wrap break-words">
                                     {message.details?.body || message.details?.message || 'No content'}
                                   </p>
-                                  
+
                                   {/* Message metadata */}
                                   <div className="flex items-center justify-between mt-1">
                                     <p className={`text-xs ${
-                                      (['SMS_SENT', 'EMAIL_SENT'].includes(message.action)) ? 'text-blue-100' : 'text-gray-500'
+                                      isFailed ? 'text-red-600' : isOutgoing ? 'text-blue-100' : 'text-gray-500'
                                     }`}>
                                       {(() => {
-                                        try {
-                                          const date = new Date(message.timestamp);
-                                          if (isNaN(date.getTime())) return 'Unknown time';
-                                          
-                                          const now = new Date();
-                                          const diffMs = now - date;
-                                          const diffHours = diffMs / (1000 * 60 * 60);
-                                          
-                                          if (diffHours < 1) {
-                                            const minutes = Math.floor(diffMs / (1000 * 60));
-                                            return minutes <= 0 ? 'Just now' : `${minutes}m ago`;
-                                          } else if (diffHours < 24) {
-                                            return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' });
-                                          } else {
-                                            return date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' });
-                                          }
-                                        } catch (error) {
-                                          return 'Unknown time';
+                                        // Message timestamps are real instants, so show them in local
+                                        // time (unlike booking dates, which are stored as UTC wall time)
+                                        const date = new Date(message.timestamp);
+                                        if (isNaN(date.getTime())) return 'Unknown time';
+
+                                        const diffMs = Date.now() - date.getTime();
+                                        const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                        if (diffMs < 60 * 60 * 1000) {
+                                          const minutes = Math.floor(diffMs / (1000 * 60));
+                                          return minutes <= 0 ? 'Just now' : `${minutes}m ago`;
                                         }
+                                        if (date.toDateString() === new Date().toDateString()) return time;
+                                        return date.toLocaleDateString('en-GB') + ' ' + time;
                                       })()} • {message.action.includes('SMS') ? 'SMS' : 'Email'}
+                                      {isFailed && ' • Failed to send'}
                                     </p>
-                                    {(['SMS_SENT', 'EMAIL_SENT'].includes(message.action)) && (
+                                    {isOutgoing && !isFailed && (
                                       <FiCheck className="h-3 w-3 text-blue-100" />
                                     )}
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -1446,10 +1445,9 @@ const LeadDetail = () => {
                                 if (templateId) {
                                   const template = emailTemplates.find(t => t._id === templateId);
                                   if (template) {
-                                    const subj = template.subject || '';
                                     const msg = template.emailBody || template.message || '';
-                                    const processedMsg = replacePlaceholders(subj) + '\n\n' + replacePlaceholders(msg);
-                                    setNewReply(processedMsg);
+                                    setEmailSubject(replacePlaceholders(template.subject || ''));
+                                    setNewReply(replacePlaceholders(msg));
                                     // Auto-resize textarea after setting new content
                                     setTimeout(() => {
                                       const textarea = document.querySelector('textarea[placeholder*="reply"]');
@@ -1488,8 +1486,23 @@ const LeadDetail = () => {
                               )
                             )}
                           </select>
+                          {(replyMode === 'sms' ? smsTemplates : emailTemplates).length === 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              No templates yet - create one in Manage Templates.
+                            </p>
+                          )}
                         </div>
-                        
+
+                        {replyMode === 'email' && (
+                          <input
+                            type="text"
+                            value={emailSubject}
+                            onChange={(e) => setEmailSubject(e.target.value)}
+                            placeholder="Subject"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        )}
+
                         <div className="flex space-x-2">
                           <textarea
                             value={newReply}
@@ -1500,21 +1513,21 @@ const LeadDetail = () => {
                             placeholder={`Type your ${replyMode === 'sms' ? 'SMS' : 'email'} reply...`}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none overflow-hidden"
                             style={{ minHeight: '60px' }}
-                            maxLength={replyMode === 'sms' ? 160 : 5000}
+                            maxLength={replyMode === 'sms' ? 918 : 5000}
                           />
                           <button
                             onClick={handleSendQuickReply}
-                            disabled={!newReply.trim()}
+                            disabled={!newReply.trim() || sendingReply}
                             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                           >
                             <FiSend className="h-4 w-4" />
-                            <span>Send</span>
+                            <span>{sendingReply ? 'Sending...' : 'Send'}</span>
                           </button>
                         </div>
                         
                         <p className="text-xs text-gray-500">
                           {replyMode === 'sms' 
-                            ? `Send to: ${lead.phone} (${newReply.length}/160 characters)` 
+                            ? `Send to: ${lead.phone} (${newReply.length} characters, ${newReply.length <= 160 ? 1 : Math.ceil(newReply.length / 153)} SMS)` 
                             : `Send to: ${lead.email || 'No email address'}`
                           }
                         </p>

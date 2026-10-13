@@ -141,6 +141,13 @@ class MessagingService {
 
     console.log('📧 Template variables:', { bookingDate, bookingDateFormatted: variables['{bookingDate}'], bookingTimeFormatted: variables['{bookingTime}'] });
 
+    // Older templates saved variables as {{leadName}} / {{{leadName}}}; collapse to {leadName}
+    ['subject', 'email_body', 'sms_body'].forEach(field => {
+      if (typeof processedTemplate[field] === 'string') {
+        processedTemplate[field] = processedTemplate[field].replace(/\{+\s*([a-zA-Z]+)\s*\}+/g, '{$1}');
+      }
+    });
+
     // Replace variables in all fields with safety checks
     Object.keys(variables).forEach(key => {
       const value = variables[key] || ''; // Ensure value is never undefined

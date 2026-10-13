@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import { useSocket } from '../context/SocketContext';
 import { decodeEmailContent, isEmailContentEncoded } from '../utils/emailContentDecoder';
+import { fetchLeadConversation } from '../utils/leadConversation';
 
 const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
   const [replyText, setReplyText] = useState('');
@@ -28,47 +29,19 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
   const fetchConversationHistory = useCallback(async () => {
     try {
       setLoadingHistory(true);
-      const response = await axios.get(`/api/leads/${notification.leadId}`);
-      const lead = response.data;
-      
-      if (lead.booking_history) {
-        const history = typeof lead.booking_history === 'string' 
-          ? JSON.parse(lead.booking_history) 
-          : lead.booking_history;
-        
-        // Filter by channel depending on the message type opened
-        const wantedActions = notification?.type === 'email'
-          ? ['EMAIL_SENT', 'EMAIL_RECEIVED']
-          : ['SMS_SENT', 'SMS_RECEIVED', 'SMS_FAILED'];
-
-        let convo = history
-          .filter(entry => wantedActions.includes(entry.action))
-          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-        // CLIENT-SIDE DEDUPLICATION - Remove exact duplicates
-        const seenKeys = new Set();
-        convo = convo.filter(entry => {
-          const timestamp = entry.timestamp ? new Date(entry.timestamp).toISOString() : '';
-          const action = entry.action || '';
-          const body = entry.details?.body || entry.details?.message || '';
-          const subject = entry.details?.subject || '';
-          const performedBy = entry.performed_by || '';
-          
-          // Create a unique key including body content to catch duplicates
-          const timeKey = timestamp ? new Date(timestamp).setSeconds(0, 0) : 0;
-          const bodyContent = body.substring(0, 200).trim().toLowerCase();
-          const key = `${action}_${timeKey}_${performedBy}_${subject.substring(0, 50)}_${bodyContent}`;
-          
-          if (seenKeys.has(key)) {
-            console.log('🔄 Client-side deduplication: Removing duplicate entry');
-            return false;
-          }
-          seenKeys.add(key);
-          return true;
-        });
-
-        setConversationHistory(convo);
+      // booking_history still holds custom SMS; the messages table holds everything else
+      let bookingHistory = null;
+      try {
+        const response = await axios.get(`/api/leads/${notification.leadId}`);
+        bookingHistory = response.data?.booking_history;
+      } catch (error) {
+        console.error('Error fetching lead for conversation:', error);
       }
+      const convo = await fetchLeadConversation(notification.leadId, bookingHistory);
+
+      // Show the channel of the message that was opened
+      const channel = notification?.type === 'email' ? 'EMAIL_' : 'SMS_';
+      setConversationHistory(convo.filter(entry => entry.action.startsWith(channel)));
     } catch (error) {
       console.error('Error fetching conversation history:', error);
       setConversationHistory([]);
@@ -327,18 +300,17 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
         });
       } else if (diffDays < 7) {
         const days = Math.floor(diffDays);
+        // Message timestamps are real instants - show local (UK) time, not UTC
         return `${days} day${days === 1 ? '' : 's'} ago at ${date.toLocaleTimeString('en-GB', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true,
-          timeZone: 'UTC'
+          hour12: true
         })}`;
       } else {
-        return date.toLocaleDateString('en-GB', { timeZone: 'UTC' }) + ' ' + date.toLocaleTimeString('en-GB', {
+        return date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString('en-GB', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true,
-          timeZone: 'UTC' 
+          hour12: true
         });
       }
     } catch (error) {
@@ -466,12 +438,12 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
                 .map((message, index) => (
                 <div 
                   key={`${message.timestamp}-${index}`}
-                  className={`flex ${(['SMS_SENT','EMAIL_SENT'].includes(message.action)) ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${/_(SENT|FAILED)$/.test(message.action) ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm ${
                     (message.action === 'SMS_SENT' || message.action === 'EMAIL_SENT')
                       ? 'bg-blue-500 text-white' 
-                      : message.action === 'SMS_FAILED' 
+                      : message.action.endsWith('_FAILED') 
                         ? 'bg-red-50 border border-red-300 text-red-800'
                         : 'bg-gray-100 border text-gray-900'
                   }`}>
@@ -480,7 +452,7 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
                     </p>
                     <div className="flex items-center justify-between mt-1">
                       <p className={`text-xs ${
-                        (message.action === 'SMS_SENT' || message.action === 'EMAIL_SENT') ? 'text-blue-100' : (message.action === 'SMS_FAILED' ? 'text-red-700' : 'text-gray-600')
+                        (message.action === 'SMS_SENT' || message.action === 'EMAIL_SENT') ? 'text-blue-100' : (message.action.endsWith('_FAILED') ? 'text-red-700' : 'text-gray-600')
                       }`}>
                         {formatTime(message.timestamp)}
                         {(message.action === 'SMS_SENT' || message.action === 'EMAIL_SENT') && (
@@ -489,7 +461,7 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
                         {(message.action === 'SMS_RECEIVED' || message.action === 'EMAIL_RECEIVED') && (
                           <span className="ml-1">• Received</span>
                         )}
-                        {message.action === 'SMS_FAILED' && (
+                        {message.action.endsWith('_FAILED') && (
                           <span className="ml-1">• Failed</span>
                         )}
                       </p>
@@ -505,7 +477,7 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
                           <FiCheck className="h-3 w-3 text-gray-500" />
                         </div>
                       )}
-                      {message.action === 'SMS_FAILED' && (
+                      {message.action.endsWith('_FAILED') && (
                         <div className="flex items-center text-red-600" title={message.details?.error_message || 'SMS send failed'}>
                           <FiAlertCircle className="h-4 w-4" />
                         </div>
@@ -532,13 +504,13 @@ const MessageModal = ({ notification, isOpen, onClose, onReply }) => {
                   placeholder="Type your reply message..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                   rows="3"
-                  maxLength={notification?.type === 'email' ? 5000 : 160}
+                  maxLength={notification?.type === 'email' ? 5000 : 918}
                 />
                 <div className="flex justify-between items-center mt-1">
                   <p className="text-xs text-gray-500">
-                    {replyText.length}/{notification?.type === 'email' ? 5000 : 160} characters
+                    {replyText.length}/{notification?.type === 'email' ? 5000 : 918} characters
                   </p>
-                  {replyText.length > 140 && (
+                  {notification?.type !== 'email' && replyText.length > 160 && (
                     <p className="text-xs text-orange-500">
                       May be sent as multiple messages
                     </p>
