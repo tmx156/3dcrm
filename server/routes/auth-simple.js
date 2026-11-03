@@ -76,6 +76,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Deleted users are soft-deleted (is_active = false) - block them
+    if (user.is_active === false || user.is_active === 0) {
+      console.warn('Login blocked for deactivated user:', user.email);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
     // Check if user has a password hash (for existing users)
     if (user.password_hash) {
       // Compare password with bcrypt
@@ -187,6 +193,10 @@ router.get('/me', async (req, res) => {
     if (!user) {
       console.error('No user data found in /me for ID:', decoded.userId);
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.is_active === false || user.is_active === 0) {
+      return res.status(401).json({ message: 'Account is inactive', forceLogout: true, clearToken: true });
     }
 
     const userData = {

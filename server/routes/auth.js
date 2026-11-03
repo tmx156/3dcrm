@@ -125,6 +125,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    if (userProfile.is_active === false || userProfile.is_active === 0) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, userProfile.password_hash);
     if (!isValidPassword) {

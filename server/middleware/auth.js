@@ -71,9 +71,9 @@ const auth = async (req, res, next) => {
     }
 
     // Check if user is active (optional, if you have an is_active column)
-    if (user.is_active === 0) {
+    if (user.is_active === false || user.is_active === 0) {
       console.error(`Authentication failed: User account is inactive - ID: ${decoded.userId}`);
-      return res.status(403).json({ message: 'Account is inactive' });
+      return res.status(401).json({ message: 'Account is inactive', forceLogout: true, clearToken: true });
     }
 
     req.user = user; // Single user object
