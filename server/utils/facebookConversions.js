@@ -4,6 +4,18 @@ const config = require('../config');
 const FB_API_VERSION = 'v22.0';
 const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
 
+// Meta Conversions API is OFF for this deployment (think.up.railway.app).
+//
+// The public site already sends its own Lead to pixel 802266729380312 with an
+// event_id the browser pixel reuses, so Meta merges the two into one conversion.
+// This app minted its own event_id (see sendEvent below), which Meta could not
+// match, so every lead forwarded to /api/webhook/leads was counted a SECOND
+// time -- roughly doubling reported leads and halving the reported cost per
+// lead. Meta reporting belongs to the other CRM, not this one.
+//
+// Set FB_CAPI_ENABLED=true in the environment to deliberately turn it back on.
+const FB_CAPI_ENABLED = process.env.FB_CAPI_ENABLED === 'true';
+
 function hashValue(value) {
   if (!value) return null;
   return crypto.createHash('sha256')
@@ -53,6 +65,7 @@ function buildUserData(lead, options = {}) {
 }
 
 async function sendEvent(eventName, lead, customData = {}, options = {}) {
+  if (!FB_CAPI_ENABLED) return null;
   const { pixelId, accessToken, testEventCode, eventSourceUrl } = config.facebook;
 
   if (!pixelId || !accessToken || pixelId === 'your_pixel_id_here') {
@@ -136,6 +149,7 @@ function trackPurchase(lead, sale, options = {}) {
 }
 
 async function sendBatch(events) {
+  if (!FB_CAPI_ENABLED) return { sent: 0, errors: 0 };
   const { pixelId, accessToken, testEventCode } = config.facebook;
 
   if (!pixelId || !accessToken || pixelId === 'your_pixel_id_here') {
@@ -186,6 +200,7 @@ async function sendBatch(events) {
 }
 
 async function testConnection() {
+  if (!FB_CAPI_ENABLED) return { configured: false, error: 'Facebook CAPI is disabled on this deployment (FB_CAPI_ENABLED is not true)' };
   const { pixelId, accessToken, testEventCode } = config.facebook;
 
   const status = {
